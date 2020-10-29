@@ -9,9 +9,6 @@ log file ${node.ospfd.logfile}
 debug ospf ${section}
 % endfor
 
-area 0.0.0.0 authentication message-digest
-
-
 % for intf in node.ospfd.interfaces:
 interface ${intf.name}
 # ${intf.description}
@@ -41,6 +38,6 @@ router ospf
   passive-interface ${itf.name}
     % endif
   % endfor
-
+  area 0.0.0.0 authentication message-digest
   <%block name="router"/>
 !
