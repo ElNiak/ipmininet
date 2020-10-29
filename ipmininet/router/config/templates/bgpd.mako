@@ -21,6 +21,9 @@ router bgp ${node.bgpd.asn}
     % if n.ebgp_multihop:
     neighbor ${n.peer} ebgp-multihop
     % endif
+    % if n.security:
+    neighbor ${n.peer} ttl-security hops ${n.nhop_sec}
+    % endif
     <%block name="neighbor"/>
 % endfor
 % for af in node.bgpd.address_families:

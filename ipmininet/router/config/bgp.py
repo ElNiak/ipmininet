@@ -504,6 +504,9 @@ class Peer:
         ebgp = self.asn != base.asn
         self.ebgp_multihop = ebgp
         self.description = '%s (%sBGP)' % (node, 'e' if ebgp else 'i')
+        #Chris:[no] neighbor PEER ttl-security hops NUMBER
+        self.security = True #TODO change dynamically
+        self.nhop_sec = 2    # TTL = 253
 
     @staticmethod
     def _find_peer_address(base: 'Router', peer: str, v6=False) \
