@@ -9,6 +9,9 @@ log file ${node.ospfd.logfile}
 debug ospf ${section}
 % endfor
 
+area 0.0.0.0 authentication message-digest
+
+
 % for intf in node.ospfd.interfaces:
 interface ${intf.name}
 # ${intf.description}
