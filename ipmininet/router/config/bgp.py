@@ -502,11 +502,11 @@ class Peer:
         self.nh_self = 'next-hop-self'
         # We enable eBGP multihop if eBGP is in use
         ebgp = self.asn != base.asn
-        self.ebgp_multihop = False # ebgp => Not compatible with ttl security, not needed to multihop ebgp sessions in our case
+        self.ebgp_multihop = ebgp # ebgp => Not compatible with ttl security, not needed to multihop ebgp sessions in our case
         self.description = '%s (%sBGP)' % (node, 'e' if ebgp else 'i')
         #Chris:[no] neighbor PEER ttl-security hops NUMBER
-        self.security = True #TODO change dynamically
-        self.nhop_sec = 3    # TTL = 252
+        self.security = False #TODO change dynamically
+        self.nhop_sec = 3     # TTL = 252
 
     @staticmethod
     def _find_peer_address(base: 'Router', peer: str, v6=False) \
