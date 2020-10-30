@@ -14,6 +14,20 @@ interface ${itf.name}
   no shutdown
   description ${itf.description}
   link-detect
+  
+  link-params 
+   enable
+	max-bw 1.25e+07
+	max-rsv-bw 1.25e+06
+	unrsv-bw 0 1.25e+06
+	unrsv-bw 1 1.25e+06
+	unrsv-bw 2 1.25e+06
+	unrsv-bw 3 1.25e+06
+	unrsv-bw 4 1.25e+06
+	unrsv-bw 5 1.25e+06
+	unrsv-bw 6 1.25e+06
+	unrsv-bw 7 1.25e+06
+	
   <%block name="interface"/>
 !
 % endfor

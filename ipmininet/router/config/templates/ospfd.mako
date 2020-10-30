@@ -39,5 +39,13 @@ router ospf
     % endif
   % endfor
   area 0.0.0.0 authentication message-digest
+  
+  mpls-te on
+  mpls-te router-address ${node.ospfd.routerid}
+  
+  segment-routing on
+  segment-routing global-block 10000 19999
+  segment-routing node-msd 8
+  segment-routing prefix 127.0.0.1/32
   <%block name="router"/>
 !
