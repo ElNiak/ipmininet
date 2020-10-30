@@ -43,8 +43,10 @@ router ospf
   mpls-te on
   mpls-te router-address ${node.ospfd.routerid}
   
+  capability opaque
   segment-routing on
   segment-routing global-block 10000 19999
+  segment-routing local-block 5000 5999
   segment-routing node-msd 8
   segment-routing prefix 127.0.0.1/32
   <%block name="router"/>
