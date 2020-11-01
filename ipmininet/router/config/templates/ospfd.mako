@@ -19,8 +19,7 @@ interface ${intf.name}
   ip ospf dead-interval ${intf.dead_int}
   ip ospf hello-interval ${intf.hello_int}
   % endif
-  ip ospf authentication message-digest
-  ip ospf message-digest-key 42 md5 my_string_authkey
+
   <%block name="interface"/>
 !
 % endfor
@@ -38,7 +37,7 @@ router ospf
   passive-interface ${itf.name}
     % endif
   % endfor
-  area 0.0.0.0 authentication message-digest
+    
   
   mpls-te on
   mpls-te router-address ${node.ospfd.routerid}
