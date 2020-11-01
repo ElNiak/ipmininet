@@ -23,7 +23,6 @@ router bgp ${node.bgpd.asn}
     % endif
     % if n.security:
     neighbor ${n.peer} ttl-security hops ${n.nhop_sec}
-	neighbor ${n.peer} password myStrongPassword
 	neighbor ${n.peer} maximum-prefix 1000
     % endif
     <%block name="neighbor"/>
