@@ -25,8 +25,6 @@ router bgp ${node.bgpd.asn}
     neighbor ${n.peer} ttl-security hops ${n.nhop_sec}
     % if n.ebgp:
 	neighbor ${n.peer} maximum-prefix 160
-    %else:
-    neighbor ${n.peer} maximum-prefix 110
     % endif
     % endif
     <%block name="neighbor"/>
