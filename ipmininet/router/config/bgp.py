@@ -501,15 +501,15 @@ class Peer:
         # We default to nexthop self for eBGP routes only
         self.nh_self = 'next-hop-self'
         # We enable eBGP multihop if eBGP is in use (before)
+        self.ebgp     = self.asn != base.asn
         self.ebgp_multihop = False # ebgp => Not compatible with ttl security, not needed to multihop ebgp sessions in our case
-        self.description = '%s (%sBGP)' % (node, 'e' if ebgp else 'i')
+        self.description = '%s (%sBGP)' % (node, 'e' if self.ebgp else 'i')
         
         #Chris:[no] neighbor PEER ttl-security hops NUMBER
         #Chris:[no] neighbor PEER password PASSWORD
         #Chris:     neighbor PEER maximum-prefix NUMBER
         self.security = True  #TODO change dynamically
         self.nhop_sec = 3     # TTL = 252
-        self.ebgp     = self.asn != base.asn
 
 
     @staticmethod
