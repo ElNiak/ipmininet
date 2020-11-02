@@ -1,7 +1,7 @@
 """Base classes to configure a BGP daemon"""
 import heapq
 from typing import Sequence, TYPE_CHECKING, Optional, Union, Tuple, List, Set
-
+import os #chris
 import itertools
 
 from ipaddress import ip_network, ip_address, IPv4Network, IPv6Network
@@ -500,8 +500,7 @@ class Peer:
             self.port = BGP_DEFAULT_PORT
         # We default to nexthop self for eBGP routes only
         self.nh_self = 'next-hop-self'
-        # We enable eBGP multihop if eBGP is in use
-        ebgp = self.asn != base.asn
+        # We enable eBGP multihop if eBGP is in use (before)
         self.ebgp_multihop = False # ebgp => Not compatible with ttl security, not needed to multihop ebgp sessions in our case
         self.description = '%s (%sBGP)' % (node, 'e' if ebgp else 'i')
         
@@ -510,6 +509,8 @@ class Peer:
         #Chris:     neighbor PEER maximum-prefix NUMBER
         self.security = True  #TODO change dynamically
         self.nhop_sec = 3     # TTL = 252
+        self.ebgp     = self.asn != base.asn
+
 
     @staticmethod
     def _find_peer_address(base: 'Router', peer: str, v6=False) \
