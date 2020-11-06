@@ -56,31 +56,26 @@ router bgp ${node.bgpd.asn}
     % if node.bgpd.rr:
     bgp cluster-id 10.0.0.0
     % endif
-    exit-address-family
-    !
 % endfor
-!
+
 % for al in node.bgpd.access_lists:
     % for e in al.entries:
-${'%s' % str(e.family) + ' ' if e.family == 'ipv6' else ''} access-list ${al.name} ${e.action} ${e.prefix}
+ip access-list ${al.name} ${e.action} ${e.prefix}
     % endfor
 % endfor
 
 % for cl in node.bgpd.community_lists:
-bgp community-list standard ${cl.name} ${cl.action} ${cl.community}
+ip community-list standard ${cl.name} ${cl.action} ${cl.community}
 % endfor
 
-
 % for rm in node.bgpd.route_maps:
-route-map ${rm.name} ${rm.match_policy} ${rm.order}
+route-map ${rm.name}-${rm.neighbor.family} ${rm.match_policy} ${rm.order}
         %for match in rm.match_cond:
-            %if match.cond_type == "access-list" and match.family == rm.family:
-    match ${family_translate(match.family)} address ${match.condition}
-            %elif match.cond_type =='next-hop':
-    match ${family_translate(match.family)} address ${match.cond_type} ${match.condition}
-            %elif match.cond_type == 'community':
-    match ${match.cond_type} ${match.condition}
-            %elif match.family == rm.family:
+            %if match.cond_type == "access-list":
+    match ${ip_statement(rm.neighbor.peer)} address ${match.condition}
+            %elif match.cond_type == "prefix-list" or match.cond_type =='next-hop':
+    match {ip_statement(rm.neighbor.peer)} address ${match.cond_type} ${match.condition}
+            %else:
     match ${match.cond_type} ${match.condition}
             %endif
         %endfor
@@ -97,6 +92,6 @@ route-map ${rm.name} ${rm.match_policy} ${rm.order}
         %if rm.exit_policy:
     on-match ${rm.exit_policy}
         %endif
-!
 % endfor
 <%block name="router"/>
+!
