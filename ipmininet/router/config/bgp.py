@@ -406,13 +406,7 @@ class BGP(QuaggaDaemon):
         Build and return a list of access_filter
         :return:
         """
-        node_access_lists = self._node.get('bgp_access_lists')
-        access_lists = []
-        if node_access_lists is not None:
-            for acl_entries in node_access_lists:
-                access_lists.append(AccessList(name=acl_entries.name,
-                                               entries=acl_entries.entries))
-        return access_lists
+        return self._node.get('bgp_access_lists', val=list())
 
     def build_route_map(self, neighbors: Sequence['Peer']) -> List[RouteMap]:
         """
