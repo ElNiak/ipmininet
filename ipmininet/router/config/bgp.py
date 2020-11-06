@@ -240,24 +240,20 @@ class BGPConfig:
         :return: self
         """
         route_maps = self.topo.getNodeInfo(self.router, 'bgp_route_maps', list)
-        if from_peer:
-            route_maps.append({
-                'match_policy': policy,
-                'peer': from_peer,
-                'match_cond': self.filters_to_match_cond(matching),
-                'direction': 'in',
-                'name': name,
-                'order': order
-            })
-        if to_peer:
-            route_maps.append({
-                'match_policy': policy,
-                'peer': to_peer,
-                'match_cond': self.filters_to_match_cond(matching),
-                'direction': 'out',
-                'name': name,
-                'order': order
-            })
+        for peer, direction in ((from_peer, 'in'), (to_peer, 'out')):
+            if peer:
+                for family in ['ipv4', 'ipv6']:
+                    match_cond = self.filters_to_match_cond(matching, family)
+                    if match_cond and len(match_cond) > 0:
+                        route_maps.append({
+                            'match_policy': policy,
+                            'peer': peer,
+                            'match_cond': match_cond,
+                            'direction': direction,
+                            'name': "%s-%s-%s" % (name, family, direction),
+                            'order': order,
+                            'family': family,
+                        })
         return self
 
     def deny(self, name: Optional[str] = None, from_peer: Optional[str] = None,
