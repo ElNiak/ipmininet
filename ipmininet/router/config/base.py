@@ -321,6 +321,7 @@ class Daemon(metaclass=abc.ABCMeta):
                 cfg.current_filename = filename
                 kwargs["node"] = cfg
                 kwargs["ip_statement"] = ip_statement
+                kwargs["family_translate"] = family_translate
                 template = self.template_lookup.get_template(
                     self.template_filenames[i])
                 cfg_content[filename] = template.render(**kwargs)
