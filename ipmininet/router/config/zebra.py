@@ -153,6 +153,32 @@ class AccessListEntry(Entry):
 
     def __init__(self, prefix: Union[str, IPv4Network, IPv6Network], action=PERMIT, family=None):
         super().__init__(prefix, action, family)
+        
+        class PrefixListEntry(Entry):
+    def __init__(self, prefix: Union[str, IPv4Network, IPv6Network], action=PERMIT, family=None, le=None, ge=None):
+        type_mask = {'ipv4': 32, 'ipv6': 128}
+
+        super().__init__(prefix, action, family)
+
+        # The 'any' prefix-list entry has a special action
+        if self.prefix == 'any':
+            self.prefix = ip_network("0.0.0.0/0") if self.family == 'ipv4' \
+                else ip_network('::/0')
+            self.le = type_mask[self.family]
+            return
+
+        if le is not None:
+            assert 0 <= le <= type_mask[self.family], "assertion %d <= le (%d) <= %d failed" % (
+            0, le, type_mask[self.family])
+        if ge is not None:
+            assert 0 <= ge <= type_mask[self.family], "assertion %d <= ge (%d) <= %d failed" % (
+            0, ge, type_mask[self.family])
+        if le is not None and ge is not None:
+            assert le >= ge, "assertion le (%d) >= ge (%d) failed! le must be lower than ge" % (le, ge)
+
+        self.le = le
+        self.ge = ge
+        
 
 class ZebraList(ABC):
     count = 0
@@ -205,6 +231,14 @@ class AccessList(ZebraList):
     def Entry(self):
         return AccessListEntry
 
+class PrefixList(ZebraList):
+    @property
+    def prefix_name(self):
+        return 'pfxl'
+
+    @property
+    def Entry(self):
+        return PrefixListEntry
 
 class RouteMapMatchCond:
     """
