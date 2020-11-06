@@ -519,7 +519,6 @@ def AF_INET6(*args, **kwargs):
     return AddressFamily('ipv6', *args, **kwargs)
 
 
-
 class Peer:
     """A BGP peer"""
     def __init__(self, base: 'Router', node: str, v6=False):
