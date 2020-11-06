@@ -54,18 +54,20 @@ router bgp ${node.bgpd.asn}
         % endif
     % endfor
     % if node.bgpd.rr:
-    bgp cluster-id ${node.bgpd.routerid}
+    bgp cluster-id 10.0.0.0
     % endif
+    exit-address-family
+    !
 % endfor
-
+!
 % for al in node.bgpd.access_lists:
     % for e in al.entries:
-ip access-list ${al.name} ${e.action} ${e.prefix}
+${al.zebra_family}access-list ${al.name} ${e.action} ${e.prefix}
     % endfor
 % endfor
 
 % for cl in node.bgpd.community_lists:
-ip community-list standard ${cl.name} ${cl.action} ${cl.community}
+bgp community-list standard ${cl.name} ${cl.action} ${cl.community}
 % endfor
 
 % for rm in node.bgpd.route_maps:
