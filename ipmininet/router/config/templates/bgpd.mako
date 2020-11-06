@@ -58,9 +58,10 @@ router bgp ${node.bgpd.asn}
     % endif
 % endfor
 
+!
 % for al in node.bgpd.access_lists:
     % for e in al.entries:
-ip access-list ${al.name} ${e.action} ${e.prefix}
+${'%s' % str(e.family) + ' ' if e.family == 'ipv6' else ''}access-list ${al.name} ${e.action} ${e.prefix}
     % endfor
 % endfor
 
