@@ -340,11 +340,13 @@ class BGPConfig:
         :param direction: direction of the route map: 'in', 'out' or 'both'
         :return: self
         """
-        match_cond = self.filters_to_match_cond(matching)
         route_maps = self.topo.getNodeInfo(self.router, 'bgp_route_maps', list)
-        route_maps.append(
-            {'peer': peer, 'match_cond': match_cond,
-             'set_actions': [set_action], 'direction': direction,'family': family})
+
+        for family in ('ipv4', 'ipv6'):
+            match_cond = self.filters_to_match_cond(matching, family)
+            route_maps.append(
+                {'peer': peer, 'match_cond': match_cond,
+                 'set_actions': [set_action], 'direction': direction, 'family': family})
         return self
 
 
