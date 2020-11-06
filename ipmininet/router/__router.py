@@ -1,20 +1,20 @@
 """This modules defines a L3 router class,
    with a modular config system."""
+import shlex
 import subprocess
 import sys
 import time
 from ipaddress import IPv4Interface, IPv6Interface
 from typing import Type, Optional, Tuple, Union, Dict, List, Sequence, Set
 
-from ipmininet import DEBUG_FLAG
-from ipmininet.utils import L3Router, realIntfList, otherIntf
-from ipmininet.link import IPIntf
-from .config import BasicRouterConfig, NodeConfig, RouterConfig
-
 import mininet.clean
-from mininet.node import Node, Host
 from mininet.log import lg
-import shlex
+from mininet.node import Node, Host
+
+from ipmininet import DEBUG_FLAG
+from ipmininet.link import IPIntf
+from ipmininet.utils import L3Router, realIntfList, otherIntf
+from .config import BasicRouterConfig, NodeConfig, RouterConfig
 
 
 class ProcessHelper:
@@ -124,6 +124,18 @@ class IPNode(Node):
         # Set relevant sysctls
         for opt, val in self.nconfig.sysctl:
             self._old_sysctl[opt] = self._set_sysctl(opt, val)
+
+        # wait until NDP has finished to check each IPv6 addresses assigned
+        # to the interface of the node.
+        # The command lists addresses failing duplicate address detection (IPv6)
+        # If any, it waits until all addresses has been checked
+        lg.debug(self._processes.node.name, 'Checking for any "tentative" addresses')
+        while a := self._processes.call("ip addr show tentative"):
+            if a is None or a == '':
+                break
+            time.sleep(.5)
+        lg.debug(self._processes.node.name, 'All IPv6 addresses has passed the Duplicate address detection mechanism')
+
         # Fire up all daemons
         for d in self.nconfig.daemons:
             self._processes.popen(shlex.split(d.startup_line))
