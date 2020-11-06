@@ -526,7 +526,7 @@ class Peer:
         """:param base: The base router that has this peer
         :param node: The actual peer"""
         _peer, other, _local_addr = self._find_peer_address(base, node, v6=v6)
-        if not self.peer or not other:
+        if not _peer or not other:
             return
         self.peer = _peer
         self.local_addr = _local_addr
