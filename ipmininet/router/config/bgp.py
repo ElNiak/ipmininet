@@ -1,21 +1,20 @@
 """Base classes to configure a BGP daemon"""
 import heapq
-from typing import Sequence, TYPE_CHECKING, Optional, Union, Tuple, List, Set
-import os #chris
 import itertools
-
+from abc import ABC
 from ipaddress import ip_network, ip_address, IPv4Network, IPv6Network
+from typing import Sequence, TYPE_CHECKING, Optional, Union, Tuple, List, Set
 
 from ipmininet.link import IPIntf
 from ipmininet.overlay import Overlay
 from ipmininet.utils import realIntfList
+from .base import RouterDaemon
 from .zebra import QuaggaDaemon, Zebra, RouteMap, AccessList, \
-    RouteMapMatchCond, CommunityList, RouteMapSetAction, PERMIT, DENY
+    RouteMapMatchCond, CommunityList, RouteMapSetAction, PERMIT, DENY, PrefixList, PrefixListEntry
 
 if TYPE_CHECKING:
     from ipmininet.iptopo import IPTopo, RouterDescription
     from ipmininet.router import Router
-
 
 BGP_DEFAULT_PORT = 179
 SHARE = "Share"
@@ -81,6 +80,7 @@ def ebgp_session(topo: 'IPTopo', a: 'RouterDescription', b: 'RouterDescription',
                  link_type: Optional[str] = None):
     """Register an eBGP peering between two nodes, and disable IGP adjacencies
     between them.
+
     :param topo: The current topology
     :param a: Local router
     :param b: Peer router
@@ -238,24 +238,20 @@ class BGPConfig:
         :return: self
         """
         route_maps = self.topo.getNodeInfo(self.router, 'bgp_route_maps', list)
-        if from_peer:
-            route_maps.append({
-                'match_policy': policy,
-                'peer': from_peer,
-                'match_cond': self.filters_to_match_cond(matching),
-                'direction': 'in',
-                'name': name,
-                'order': order
-            })
-        if to_peer:
-            route_maps.append({
-                'match_policy': policy,
-                'peer': to_peer,
-                'match_cond': self.filters_to_match_cond(matching),
-                'direction': 'out',
-                'name': name,
-                'order': order
-            })
+        for peer, direction in ((from_peer, 'in'), (to_peer, 'out')):
+            if peer:
+                for family in ['ipv4', 'ipv6']:
+                    match_cond = self.filters_to_match_cond(matching, family)
+                    if match_cond and len(match_cond) > 0:
+                        route_maps.append({
+                            'match_policy': policy,
+                            'peer': peer,
+                            'match_cond': match_cond,
+                            'direction': direction,
+                            'name': "%s-%s-%s" % (name, family, direction),
+                            'order': order,
+                            'family': family,
+                        })
         return self
 
     def deny(self, name: Optional[str] = None, from_peer: Optional[str] = None,
@@ -300,23 +296,34 @@ class BGPConfig:
 
     def filters_to_match_cond(self,
                               filter_list: Sequence[Union[AccessList,
-                                                          CommunityList]]):
+                                                          CommunityList,
+                                                          PrefixList]],
+                              family: str):
         match_cond = []
+        assert family in {'ipv4', 'ipv6'}, "Bad family %s" % family
         access_lists = self.topo.getNodeInfo(self.router, 'bgp_access_lists',
                                              list)
         community_list = self.topo.getNodeInfo(self.router,
                                                'bgp_community_lists', list)
 
+        prefix_list = self.topo.getNodeInfo(self.router, 'bgp_prefix_lists', list)
+
         # Create match_conditions based on the provided filters
         for f in filter_list:
             if isinstance(f, CommunityList):
-                match_cond.append(RouteMapMatchCond('community', f.name))
+                match_cond.append(RouteMapMatchCond('community', f.name, f.family))
                 if f not in community_list:
                     community_list.append(f)
             elif isinstance(f, AccessList):
-                match_cond.append(RouteMapMatchCond('access-list', f.name))
-                if f not in access_lists:
-                    access_lists.append(f)
+                if f.family == family:
+                    match_cond.append(RouteMapMatchCond('access-list', f.name, f.family))
+                    if f not in access_lists:
+                        access_lists.append(f)
+            elif isinstance(f, PrefixList):
+                if f.family == family:
+                    match_cond.append(RouteMapMatchCond('prefix-list', f.name, f.family))
+                    if f not in prefix_list:
+                        prefix_list.append(f)
             else:
                 raise Exception("Filter not yet implemented")
         return match_cond
@@ -332,11 +339,13 @@ class BGPConfig:
         :param direction: direction of the route map: 'in', 'out' or 'both'
         :return: self
         """
-        match_cond = self.filters_to_match_cond(matching)
         route_maps = self.topo.getNodeInfo(self.router, 'bgp_route_maps', list)
-        route_maps.append(
-            {'peer': peer, 'match_cond': match_cond,
-             'set_actions': [set_action], 'direction': direction})
+
+        for family in ('ipv4', 'ipv6'):
+            match_cond = self.filters_to_match_cond(matching, family)
+            route_maps.append(
+                {'peer': peer, 'match_cond': match_cond,
+                 'set_actions': [set_action], 'direction': direction, 'family': family})
         return self
 
 
@@ -354,7 +363,30 @@ def set_rr(topo: 'IPTopo', rr: str, peers: Sequence[str] = ()):
     router_is_rr.append(True)
 
 
-class BGP(QuaggaDaemon):
+class AbstractBGP(ABC, RouterDaemon):
+
+    @staticmethod
+    def _address_families(af: List['AddressFamily'], nei: List['Peer']) \
+            -> List['AddressFamily']:
+        """Complete the address families: add extra networks, or activate
+        neighbors. The default is to activate all given neighbors"""
+        for a in af:
+            a.neighbors.extend(nei)
+        return af
+
+    def _build_neighbors(self) -> List['Peer']:
+        """Compute the set of BGP peers for this BGP router
+        :return: set of neighbors"""
+        neighbors = []
+        for x in self._node.get('bgp_peers', []):
+            for v6 in [True, False]:
+                peer = Peer(self._node, x, v6=v6)
+                if peer.peer:
+                    neighbors.append(peer)
+        return neighbors
+
+
+class BGP(QuaggaDaemon, AbstractBGP):
     """This class provides the configuration skeletons for BGP routers."""
     NAME = 'bgpd'
     DEPENDS = (Zebra,)
@@ -378,6 +410,7 @@ class BGP(QuaggaDaemon):
             self.options.address_families, cfg.neighbors)
         cfg.access_lists = self.build_access_list()
         cfg.community_lists = self.build_community_list()
+        cfg.prefix_lists = self.build_prefix_list()
         cfg.route_maps = self.build_route_map(cfg.neighbors)
         cfg.rr = self._node.get('bgp_rr_info')
 
@@ -408,6 +441,9 @@ class BGP(QuaggaDaemon):
         """
         return self._node.get('bgp_access_lists', val=list())
 
+    def build_prefix_list(self):
+        return self._node.get('bgp_prefix_lists', val=list())
+
     def build_route_map(self, neighbors: Sequence['Peer']) -> List[RouteMap]:
         """
         Build and return a list of route map for the current node
@@ -422,18 +458,19 @@ class BGP(QuaggaDaemon):
                     if neighbor.node == remote_peer:
                         peers.append(neighbor)
                 for peer in peers:
-                    kwargs['neighbor'] = peer
-                    rm = RouteMap(**kwargs)
-                    # If route map already exist, add conditions and actions
-                    # to it
-                    try:
-                        index = route_maps.index(rm)
-                        tmp_rm = route_maps.pop(index)
-                        rm.append_match_cond(tmp_rm.match_cond)
-                        rm.append_set_action(tmp_rm.set_actions)
-                    except ValueError:
-                        pass
-                    route_maps.append(rm)
+                    if peer.family == kwargs['family']:
+                        kwargs['neighbor'] = peer
+                        rm = RouteMap(**kwargs)
+                        # If route map already exist, add conditions and actions
+                        # to it
+                        try:
+                            index = route_maps.index(rm)
+                            tmp_rm = route_maps.pop(index)
+                            rm.append_match_cond(tmp_rm.match_cond)
+                            rm.append_set_action(tmp_rm.set_actions)
+                        except ValueError:
+                            pass
+                        route_maps.append(rm)
         return route_maps
 
     def set_defaults(self, defaults):
@@ -441,26 +478,6 @@ class BGP(QuaggaDaemon):
         :param address_families: The set of AddressFamily to use"""
         defaults.address_families = [AF_INET(), AF_INET6()]
         super().set_defaults(defaults)
-
-    def _build_neighbors(self) -> List['Peer']:
-        """Compute the set of BGP peers for this BGP router
-        :return: set of neighbors"""
-        neighbors = []
-        for x in self._node.get('bgp_peers', []):
-            for v6 in [True, False]:
-                peer = Peer(self._node, x, v6=v6)
-                if peer.peer:
-                    neighbors.append(peer)
-        return neighbors
-
-    @staticmethod
-    def _address_families(af: List['AddressFamily'], nei: List['Peer']) \
-            -> List['AddressFamily']:
-        """Complete the address families: add extra networks, or activate
-        neighbors. The default is to activate all given neighbors"""
-        for a in af:
-            a.neighbors.extend(nei)
-        return af
 
     @classmethod
     def get_config(cls, topo: 'IPTopo', node: 'RouterDescription', **kwargs):
@@ -471,11 +488,25 @@ class AddressFamily:
     """An address family that is exchanged through BGP"""
 
     def __init__(self, af_name: str, redistribute: Sequence[str] = (),
-                 networks: Sequence[Union[str, IPv4Network, IPv6Network]] = ()):
+                 networks: Sequence[Union[str, IPv4Network, IPv6Network]] = (),
+                 routes=()):
         self.name = af_name
         self.networks = [ip_network(str(n)) for n in networks]
         self.redistribute = redistribute
         self.neighbors = []  # type: List[Peer]
+        self.routes = routes
+
+    @property
+    def family(self):
+        """
+        :return: the AddressFamily to be used in FRRouting configuration
+        """
+        if self.name == 'ipv4':
+            return 'ip'
+        elif self.name == 'ipv6':
+            return 'ip6'
+        else:
+            ValueError("Unsupported AddressFamily %s" % self.name)
 
 
 def AF_INET(*args, **kwargs):
@@ -488,14 +519,17 @@ def AF_INET6(*args, **kwargs):
     return AddressFamily('ipv6', *args, **kwargs)
 
 
+
 class Peer:
     """A BGP peer"""
     def __init__(self, base: 'Router', node: str, v6=False):
         """:param base: The base router that has this peer
         :param node: The actual peer"""
-        self.peer, other = self._find_peer_address(base, node, v6=v6)
+        _peer, other, _local_addr = self._find_peer_address(base, node, v6=v6)
         if not self.peer or not other:
             return
+        self.peer = _peer
+        self.local_addr = _local_addr
         self.node = node
         self.asn = other.asn
         self.family = 'ipv4' if not v6 else 'ipv6'
@@ -519,17 +553,17 @@ class Peer:
 
     @staticmethod
     def _find_peer_address(base: 'Router', peer: str, v6=False) \
-            -> Tuple[Optional[str], Optional['Router']]:
+            -> Tuple[Optional[str], Optional['Router'], Optional[str]]:
         """Return the IP address that base should try to contact to establish
         a peering"""
         visited = set()  # type: Set[IPIntf]
         to_visit = {i.name: i for i in realIntfList(base)}
-        prio_queue = [(0, i) for i in to_visit.keys()]
+        prio_queue: List[Tuple[int, str, IPIntf]] = [(0, i, to_visit[i]) for i in to_visit.keys()]
         heapq.heapify(prio_queue)
         # Explore all interfaces in base ASN recursively, until we find one
         # connected to the peer
         while to_visit:
-            path_cost, i = heapq.heappop(prio_queue)
+            path_cost, i, my_interface = heapq.heappop(prio_queue)
             if i in visited:
                 continue
             i = to_visit.pop(i)
@@ -537,13 +571,12 @@ class Peer:
             for n in i.broadcast_domain.routers:
                 if n.node.name == peer:
                     if not v6:
-                        return n.ip, n.node
+                        return n.ip, n.node, my_interface.ip
                     if n.ip6 and not ip_address(n.ip6).is_link_local:
-                        return n.ip6, n.node
-                    return None, None
+                        return n.ip6, n.node, my_interface.ip6
+                    return None, None, None
                 if n.node.asn == base.asn or not n.node.asn:
                     for i in realIntfList(n.node):
                         to_visit[i.name] = i
-                        heapq.heappush(prio_queue, (path_cost + i.igp_metric,
-                                                    i.name))
-        return None, None
+                        heapq.heappush(prio_queue, (path_cost + i.igp_metric, i.name, my_interface))
+        return None, None, None
