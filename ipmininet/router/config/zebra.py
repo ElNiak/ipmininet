@@ -262,7 +262,7 @@ class RouteMap:
                  exit_policy: Optional[str] = None, order=10,
                  proto: Sequence[str] = (), neighbor: Sequence = (),
                  direction='in',
-                 family=None)):
+                 family=None):
         """
         :param name: The name of the route-map, defaulting to rm##
         :param match_policy: Deny or permit the actions if the route match
