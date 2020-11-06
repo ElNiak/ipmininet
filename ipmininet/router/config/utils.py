@@ -36,3 +36,12 @@ def ip_statement(ip: Union[int, str, IPv6Address, IPv4Address]):
     if not isinstance(ip, int):
         ip = ip_interface(str(ip)).version
     return 'ipv6' if ip == 6 else 'ip'
+
+
+def family_translate(family: str):
+    if family == 'ipv4':
+        return 'ip'
+    elif family == 'ipv6':
+        return 'ipv6'
+    else:
+        raise ValueError("%s is not a valid address family" % family)
