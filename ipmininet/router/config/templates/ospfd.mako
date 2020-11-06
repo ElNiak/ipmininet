@@ -40,6 +40,9 @@ router ospf
   % endfor
   area 0.0.0.0 authentication message-digest
   
+  % if ${node.name} == "r_bhs2" or ${node.name} == "r_gra2":
+  network 172.31.255.124/32 area ${net.area}
+  % endif
   mpls-te on
   mpls-te router-address ${node.ospfd.routerid}
   
