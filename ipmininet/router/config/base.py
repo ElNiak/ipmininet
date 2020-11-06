@@ -6,12 +6,12 @@ import os
 import abc
 from contextlib import closing
 from operator import attrgetter
-from .utils import ConfigDict, ip_statement, family_translate
+from ipaddress import ip_address
 from mako.lookup import TemplateLookup
 from typing import TYPE_CHECKING, Iterable, Optional, Dict, Union, Type, \
     Tuple, Sequence, List, Set
 
-from .utils import ConfigDict, ip_statement
+from .utils import ConfigDict, ip_statement, family_translate
 from ipmininet.utils import require_cmd, realIntfList
 from ipmininet.link import OrderedAddress, IPIntf
 
