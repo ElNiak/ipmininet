@@ -90,8 +90,8 @@ def ebgp_session(topo: 'IPTopo', a: 'RouterDescription', b: 'RouterDescription',
                       filter and set local pref based on the link type
     """
     if link_type:
-        all_al_v4 = AccessList('ipv4', name='Allv4', entries=('any',))
-        all_al_v6 = AccessList('ipv6', name='Allv6', entries=('any',))
+        all_al_v4 = AccessList(family='ipv4', name='Allv4', entries=('any',))
+        all_al_v6 = AccessList(family='ipv6', name='Allv6', entries=('any',))
         # Create the community filter for the export policy
         peers_link = CommunityList(name='from-peers', community=1,
                                    action=PERMIT)
