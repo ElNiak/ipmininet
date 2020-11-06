@@ -54,7 +54,7 @@ router bgp ${node.bgpd.asn}
         % endif
     % endfor
     % if node.bgpd.rr:
-    bgp cluster-id 10.0.0.0
+    bgp cluster-id ${node.bgpd.routerid}
     % endif
 % endfor
 

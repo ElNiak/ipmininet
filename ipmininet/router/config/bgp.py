@@ -81,7 +81,6 @@ def ebgp_session(topo: 'IPTopo', a: 'RouterDescription', b: 'RouterDescription',
                  link_type: Optional[str] = None):
     """Register an eBGP peering between two nodes, and disable IGP adjacencies
     between them.
-
     :param topo: The current topology
     :param a: Local router
     :param b: Peer router
@@ -90,7 +89,8 @@ def ebgp_session(topo: 'IPTopo', a: 'RouterDescription', b: 'RouterDescription',
                       filter and set local pref based on the link type
     """
     if link_type:
-        all_al = AccessList('All', ('any',))
+        all_al_v4 = AccessList('ipv4', name='Allv4', entries=('any',))
+        all_al_v6 = AccessList('ipv6', name='Allv6', entries=('any',))
         # Create the community filter for the export policy
         peers_link = CommunityList(name='from-peers', community=1,
                                    action=PERMIT)
@@ -99,11 +99,11 @@ def ebgp_session(topo: 'IPTopo', a: 'RouterDescription', b: 'RouterDescription',
         if link_type == SHARE:
             # Set the community and local pref for the import policy
             a.get_config(BGP)\
-                .set_community(1, from_peer=b, matching=(all_al,)) \
-                .set_local_pref(150, from_peer=b, matching=(all_al,))
+                .set_community(1, from_peer=b, matching=(all_al_v4, all_al_v6)) \
+                .set_local_pref(150, from_peer=b, matching=(all_al_v4, all_al_v6,))
             b.get_config(BGP)\
-                .set_community(1, from_peer=a, matching=(all_al,))\
-                .set_local_pref(150, from_peer=a, matching=(all_al,))
+                .set_community(1, from_peer=a, matching=(all_al_v4, all_al_v6,))\
+                .set_local_pref(150, from_peer=a, matching=(all_al_v4, all_al_v6,))
 
             # Create route maps to filter exported route
             a.get_config(BGP)\
@@ -123,11 +123,11 @@ def ebgp_session(topo: 'IPTopo', a: 'RouterDescription', b: 'RouterDescription',
         elif link_type == CLIENT_PROVIDER:
             # Set the community and local pref for the import policy
             a.get_config(BGP)\
-                .set_community(3, from_peer=b, matching=(all_al,)) \
-                .set_local_pref(100, from_peer=b, matching=(all_al,))
+                .set_community(3, from_peer=b, matching=(all_al_v4, all_al_v6,)) \
+                .set_local_pref(100, from_peer=b, matching=(all_al_v4, all_al_v6,))
             b.get_config(BGP)\
-                .set_community(2, from_peer=a, matching=(all_al,))\
-                .set_local_pref(200, from_peer=a, matching=(all_al,))
+                .set_community(2, from_peer=a, matching=(all_al_v4, all_al_v6,))\
+                .set_local_pref(200, from_peer=a, matching=(all_al_v4, all_al_v6,))
 
             # Create route maps to filter exported route
             a.get_config(BGP)\
@@ -136,6 +136,17 @@ def ebgp_session(topo: 'IPTopo', a: 'RouterDescription', b: 'RouterDescription',
                 .deny('export-to-up-' + b, to_peer=b, matching=(peers_link,),
                       order=15)\
                 .permit('export-to-up-' + b, to_peer=b, order=20)
+
+    else:  # recent version of BGP must define import/export filters for eBGP sessions (RFC 8212)
+        ip4_pfxl = PrefixList(name="hello-world-v4", family='ipv4', entries=(PrefixListEntry('0.0.0.0/0', le=32),))
+        ip6_pfxl = PrefixList(name="hello-world-v6", family='ipv6', entries=(PrefixListEntry('::/0', le=128),))
+
+        a.get_config(BGP) \
+            .filter('import-all', policy=PERMIT, from_peer=a, to_peer=b) \
+            .filter('export-all', policy=PERMIT, from_peer=b, to_peer=a)
+        b.get_config(BGP) \
+            .filter('import-all2', policy=PERMIT, from_peer=a, to_peer=b, matching=(ip4_pfxl, ip6_pfxl)) \
+            .filter('export-all2', policy=PERMIT, from_peer=b, to_peer=a, matching=(ip4_pfxl, ip6_pfxl))
 
     bgp_peering(topo, a, b)
     topo.linkInfo(a, b)['igp_passive'] = True
