@@ -154,7 +154,7 @@ class AccessListEntry(Entry):
     def __init__(self, prefix: Union[str, IPv4Network, IPv6Network], action=PERMIT, family=None):
         super().__init__(prefix, action, family)
         
-        class PrefixListEntry(Entry):
+class PrefixListEntry(Entry):
     def __init__(self, prefix: Union[str, IPv4Network, IPv6Network], action=PERMIT, family=None, le=None, ge=None):
         type_mask = {'ipv4': 32, 'ipv6': 128}
 
