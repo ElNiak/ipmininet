@@ -363,8 +363,29 @@ def set_rr(topo: 'IPTopo', rr: str, peers: Sequence[str] = ()):
     router_is_rr = topo.getNodeInfo(rr, 'bgp_rr_info', list)
     router_is_rr.append(True)
 
+class AbstractBGP(ABC, RouterDaemon):
 
-class BGP(QuaggaDaemon):
+    @staticmethod
+    def _address_families(af: List['AddressFamily'], nei: List['Peer']) \
+            -> List['AddressFamily']:
+        """Complete the address families: add extra networks, or activate
+        neighbors. The default is to activate all given neighbors"""
+        for a in af:
+            a.neighbors.extend(nei)
+        return af
+
+    def _build_neighbors(self) -> List['Peer']:
+        """Compute the set of BGP peers for this BGP router
+        :return: set of neighbors"""
+        neighbors = []
+        for x in self._node.get('bgp_peers', []):
+            for v6 in [True, False]:
+                peer = Peer(self._node, x, v6=v6)
+                if peer.peer:
+                    neighbors.append(peer)
+        return neighbors
+        
+class BGP(QuaggaDaemon, AbstractBGP):
     """This class provides the configuration skeletons for BGP routers."""
     NAME = 'bgpd'
     DEPENDS = (Zebra,)
@@ -388,6 +409,7 @@ class BGP(QuaggaDaemon):
             self.options.address_families, cfg.neighbors)
         cfg.access_lists = self.build_access_list()
         cfg.community_lists = self.build_community_list()
+        #cfg.prefix_lists = self.build_prefix_list()
         cfg.route_maps = self.build_route_map(cfg.neighbors)
         cfg.rr = self._node.get('bgp_rr_info')
 
@@ -452,26 +474,6 @@ class BGP(QuaggaDaemon):
         :param address_families: The set of AddressFamily to use"""
         defaults.address_families = [AF_INET(), AF_INET6()]
         super().set_defaults(defaults)
-
-    def _build_neighbors(self) -> List['Peer']:
-        """Compute the set of BGP peers for this BGP router
-        :return: set of neighbors"""
-        neighbors = []
-        for x in self._node.get('bgp_peers', []):
-            for v6 in [True, False]:
-                peer = Peer(self._node, x, v6=v6)
-                if peer.peer:
-                    neighbors.append(peer)
-        return neighbors
-
-    @staticmethod
-    def _address_families(af: List['AddressFamily'], nei: List['Peer']) \
-            -> List['AddressFamily']:
-        """Complete the address families: add extra networks, or activate
-        neighbors. The default is to activate all given neighbors"""
-        for a in af:
-            a.neighbors.extend(nei)
-        return af
 
     @classmethod
     def get_config(cls, topo: 'IPTopo', node: 'RouterDescription', **kwargs):
