@@ -76,8 +76,6 @@ route-map ${rm.name} ${rm.match_policy} ${rm.order}
         %for match in rm.match_cond:
             %if match.cond_type == "access-list" and match.family == rm.family:
     match ${family_translate(match.family)} address ${match.condition}
-            %elif match.cond_type == "prefix-list" and match.family == rm.family:
-    match ${family_translate(match.family)} address ${match.cond_type} ${match.condition}
             %elif match.cond_type =='next-hop':
     match ${family_translate(match.family)} address ${match.cond_type} ${match.condition}
             %elif match.cond_type == 'community':
