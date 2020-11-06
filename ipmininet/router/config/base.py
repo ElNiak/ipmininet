@@ -6,7 +6,7 @@ import os
 import abc
 from contextlib import closing
 from operator import attrgetter
-from ipaddress import ip_address
+from .utils import ConfigDict, ip_statement, family_translate
 from mako.lookup import TemplateLookup
 from typing import TYPE_CHECKING, Iterable, Optional, Dict, Union, Type, \
     Tuple, Sequence, List, Set

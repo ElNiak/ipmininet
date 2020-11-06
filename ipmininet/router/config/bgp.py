@@ -9,6 +9,7 @@ from ipaddress import ip_network, ip_address, IPv4Network, IPv6Network
 from ipmininet.link import IPIntf
 from ipmininet.overlay import Overlay
 from ipmininet.utils import realIntfList
+from .utils import ConfigDict, ip_statement, family_translate
 from .zebra import QuaggaDaemon, Zebra, RouteMap, AccessList, \
     RouteMapMatchCond, CommunityList, RouteMapSetAction, PERMIT, DENY
 
@@ -300,8 +301,10 @@ class BGPConfig:
 
     def filters_to_match_cond(self,
                               filter_list: Sequence[Union[AccessList,
-                                                          CommunityList]]):
+                                                          CommunityList]],
+                              family=None):
         match_cond = []
+        assert family in {'ipv4', 'ipv6'}, "Bad family %s" % family
         access_lists = self.topo.getNodeInfo(self.router, 'bgp_access_lists',
                                              list)
         community_list = self.topo.getNodeInfo(self.router,
@@ -310,9 +313,14 @@ class BGPConfig:
         # Create match_conditions based on the provided filters
         for f in filter_list:
             if isinstance(f, CommunityList):
-                match_cond.append(RouteMapMatchCond('community', f.name))
+                match_cond.append(RouteMapMatchCond('community', f.name, f.family))
                 if f not in community_list:
                     community_list.append(f)
+            elif isinstance(f, AccessList):
+                if f.family == family:
+                    match_cond.append(RouteMapMatchCond('access-list', f.name, f.family))
+                    if f not in access_lists:
+                        access_lists.append(f)
             elif isinstance(f, AccessList):
                 match_cond.append(RouteMapMatchCond('access-list', f.name))
                 if f not in access_lists:
@@ -336,7 +344,7 @@ class BGPConfig:
         route_maps = self.topo.getNodeInfo(self.router, 'bgp_route_maps', list)
         route_maps.append(
             {'peer': peer, 'match_cond': match_cond,
-             'set_actions': [set_action], 'direction': direction})
+             'set_actions': [set_action], 'direction': direction,'family': family})
         return self
 
 
@@ -406,13 +414,7 @@ class BGP(QuaggaDaemon):
         Build and return a list of access_filter
         :return:
         """
-        node_access_lists = self._node.get('bgp_access_lists')
-        access_lists = []
-        if node_access_lists is not None:
-            for acl_entries in node_access_lists:
-                access_lists.append(AccessList(name=acl_entries.name,
-                                               entries=acl_entries.entries))
-        return access_lists
+        return [] if node_access_lists is None else node_access_lists
 
     def build_route_map(self, neighbors: Sequence['Peer']) -> List[RouteMap]:
         """
@@ -428,18 +430,19 @@ class BGP(QuaggaDaemon):
                     if neighbor.node == remote_peer:
                         peers.append(neighbor)
                 for peer in peers:
-                    kwargs['neighbor'] = peer
-                    rm = RouteMap(**kwargs)
-                    # If route map already exist, add conditions and actions
-                    # to it
-                    try:
-                        index = route_maps.index(rm)
-                        tmp_rm = route_maps.pop(index)
-                        rm.append_match_cond(tmp_rm.match_cond)
-                        rm.append_set_action(tmp_rm.set_actions)
-                    except ValueError:
-                        pass
-                    route_maps.append(rm)
+                    if ip_statement(peer.peer) == family_translate(kwargs['family']):
+                        kwargs['neighbor'] = peer
+                        rm = RouteMap(**kwargs)
+                        # If route map already exist, add conditions and actions
+                        # to it
+                        try:
+                            index = route_maps.index(rm)
+                            tmp_rm = route_maps.pop(index)
+                            rm.append_match_cond(tmp_rm.match_cond)
+                            rm.append_set_action(tmp_rm.set_actions)
+                        except ValueError:
+                            pass
+                        route_maps.append(rm)
         return route_maps
 
     def set_defaults(self, defaults):
