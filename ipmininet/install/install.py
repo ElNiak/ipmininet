@@ -1,7 +1,6 @@
 import argparse
 import os
 import re
-import stat
 import sys
 
 # For imports to work during setup and afterwards
@@ -10,6 +9,7 @@ from utils import supported_distributions, identify_distribution, sh
 
 MininetVersion = "2.3.0d6"
 FRRoutingVersion = "7.1"
+ExaBGPVersion = "4.2.11"
 
 os.environ["PATH"] = "%s:/sbin:/usr/sbin/:/usr/local/sbin" % os.environ["PATH"]
 
@@ -31,6 +31,9 @@ def parse_args():
     parser.add_argument("-q", "--install-frrouting",
                         help="Install FRRouting (version %s) daemons"
                         % FRRoutingVersion,
+                        action="store_true")
+    parser.add_argument("-e", "--install-exabgp",
+                        help="Install ExaBGP (version %s) daemon" % ExaBGPVersion,
                         action="store_true")
     parser.add_argument("-r", "--install-radvd",
                         help="Install the RADVD daemon", action="store_true")
@@ -99,6 +102,16 @@ def install_libyang(output_dir: str):
            cwd=output_dir)
 
 
+def link_to_standard_dir(base_dir: str, standard_dir: str):
+    for root, _, files in os.walk(base_dir):
+        for f in files:
+            link = os.path.join(standard_dir, os.path.basename(f))
+            if os.path.exists(link):
+                os.remove(link)
+            os.symlink(os.path.join(root, f), link)
+        break
+
+
 def install_frrouting(output_dir: str):
     dist.install("autoconf", "automake", "libtool", "make", "gcc", "groff",
                  "patch", "make", "bison", "flex", "gawk", "texinfo",
@@ -135,20 +148,8 @@ def install_frrouting(output_dir: str):
     sh("usermod -a -G frr root", may_fail=True)
     sh("usermod -a -G frrvty root", may_fail=True)
 
-    for root, _, files in os.walk(os.path.join(frrouting_install, "sbin")):
-        for f in files:
-            link = os.path.join("/usr/sbin", os.path.basename(f))
-            if os.path.exists(link):
-                os.remove(link)
-            os.symlink(os.path.join(root, f), link)
-        break
-    for root, _, files in os.walk(os.path.join(frrouting_install, "bin")):
-        for f in files:
-            link = os.path.join("/usr/bin", os.path.basename(f))
-            if os.path.exists(link):
-                os.remove(link)
-            os.symlink(os.path.join(root, f), link)
-        break
+    for curr_dir in ('sbin', 'bin'):
+        link_to_standard_dir(os.path.join(frrouting_install, curr_dir), "/usr/%s" % curr_dir)
 
 
 def install_openr(output_dir: str, may_fail=False):
@@ -168,6 +169,27 @@ def install_openr(output_dir: str, may_fail=False):
     # We should end here only if may_fail is True
     if p.returncode != 0:
         print("WARNING: Ignoring failed OpenR installation.", file=sys.stderr)
+
+
+def install_exabgp(output_dir: str, may_fail=False):
+    git_url = "https://github.com/Exa-Networks/exabgp.git"
+    exabgp_src_folder = "exabgp-%s-src" % ExaBGPVersion
+    exabgp_path_src_dir = os.path.join(output_dir, exabgp_src_folder)
+    exabgp_self_executable = os.path.join(output_dir, "exabgp")
+    final_link = "/usr/sbin/exabgp"
+
+    sh("git clone {url} -o {src_dir}".format(url=git_url, src_dir=exabgp_src_folder),
+       cwd=output_dir, may_fail=may_fail)
+
+    sh("git checkout %s" % ExaBGPVersion, cwd=exabgp_path_src_dir, may_fail=may_fail)
+
+    # create self-contained executable
+    sh('python3 -m zipapp -o {executable_path} -m exabgp.application:main  -p "/usr/bin/env python3" lib'
+       .format(executable_path=exabgp_self_executable), cwd=exabgp_path_src_dir, may_fail=may_fail)
+
+    if os.path.exists(final_link):
+        os.remove(final_link)
+    os.symlink(exabgp_self_executable, final_link)
 
 
 def update_grub():
