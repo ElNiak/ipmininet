@@ -467,13 +467,15 @@ class AddressFamily:
     """An address family that is exchanged through BGP"""
 
     def __init__(self, af_name: str, redistribute: Sequence[str] = (),
-                 networks: Sequence[Union[str, IPv4Network, IPv6Network]] = ()
+                 networks: Sequence[Union[str, IPv4Network, IPv6Network]] = (),
                  routes=()):
         self.name = af_name
         self.networks = [ip_network(str(n)) for n in networks]
         self.redistribute = redistribute
         self.neighbors = []  # type: List[Peer]
-        @property
+        self.routes = routes
+        
+    @property
     def family(self):
         """
         :return: the AddressFamily to be used in FRRouting configuration
