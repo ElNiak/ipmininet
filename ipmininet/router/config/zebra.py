@@ -1,6 +1,6 @@
 import os
 import socket
-from ipaddress import IPv4Network, IPv6Network
+from ipaddress import IPv4Network, IPv6Network, ip_network
 from typing import Optional, Union, Sequence, Tuple
 from abc import abstractmethod, ABC
 from .base import RouterDaemon
@@ -10,10 +10,11 @@ from .utils import ConfigDict
 DENY = 'deny'
 PERMIT = 'permit'
 
-def get_family(prefix: Union[IPv4Network, IPv6Network]) -> Optional[str]:
-    if isinstance(prefix, IPv4Network):
+def get_family(prefix: Union[str, IPv4Network, IPv6Network]) -> Optional[str]:
+    pfx = ip_network(prefix) if isinstance(prefix, str) else prefix
+    if pfx.version == 4:
         return 'ipv4'
-    elif isinstance(prefix, IPv6Network):
+    elif pfx.version == 6:
         return 'ipv6'
 
     return None
@@ -140,13 +141,20 @@ class Entry:
             else:
                 _prefix = ip_network(prefix)
                 if family is not None:
-                    assert get_family(self.prefix) == family, "prefix family %s != family (%s)" % (get_family(self.prefix), family)
+                    assert get_family(_prefix) == family, "prefix family %s != family (%s)" % (get_family(_prefix), family)
         else:
             _prefix = prefix
 
         self.prefix = _prefix
         self.action = action
         self.family = family if family else get_family(self.prefix)
+    
+    @property
+    def zebra_family(self):
+        if self.family == 'ipv4':
+            return 'ip'
+        return 'ipv6'
+    
         
 class AccessListEntry(Entry):
     """A zebra access-list entry"""
