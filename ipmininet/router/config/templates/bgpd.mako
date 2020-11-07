@@ -70,11 +70,6 @@ router bgp ${node.bgpd.asn}
 % endfor
 
 
-% for pl in node.bgpd.prefix_lists:
-    %for e in pl.entries:
-${pl.zebra_family} prefix-list ${pl.name} ${e.action} ${e.prefix} ${ 'le %s' % e.le if e.le else ''} ${ 'ge %s' % e.ge if e.ge else ''}
-    %endfor
-% endfor
 
 % for rm in node.bgpd.route_maps:
 route-map ${rm.name} ${rm.match_policy} ${rm.order}
