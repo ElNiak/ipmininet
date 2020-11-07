@@ -232,6 +232,12 @@ class AccessList(ZebraList):
     which describes all prefix belonging or not to this ACL"""
 
     @property
+    def zebra_family(self):
+        if self.family == 'ipv4':
+            return ''
+        return 'ipv6 '
+        
+    @property
     def prefix_name(self):
         return 'acl'
 
@@ -240,6 +246,12 @@ class AccessList(ZebraList):
         return AccessListEntry
 
 class PrefixList(ZebraList):
+    @property
+    def zebra_family(self):
+        if self.family == 'ipv4':
+            return 'ip'
+        return 'ipv6'
+        
     @property
     def prefix_name(self):
         return 'pfxl'
@@ -334,11 +346,15 @@ class RouteMap:
         :param direction: Direction of the routemap(in, out, both)
         """
         RouteMap.count += 1
+
+        assert family in {'ipv4', 'ipv6', 'community'}
+        
         self.name = name if name else 'rm%d' % RouteMap.count
         self.match_policy = match_policy
         self.match_cond = [e if isinstance(e, RouteMapMatchCond)
                            else RouteMapMatchCond(cond_type=e[0],
-                                                  condition=e[1])
+                                                  condition=e[1],
+                                                  family = family)
                            for e in match_cond]
         self.set_actions = [e if isinstance(e, RouteMapSetAction)
                             else RouteMapSetAction(action_type=e[0], value=e[1])
@@ -356,7 +372,7 @@ class RouteMap:
                and self.direction == other.direction \
                and self.exit_policy == other.exit_policy \
                and self.order == other.order \
-                and self.family == other.family
+               and self.family == other.family
 
 
     def append_match_cond(self, match_conditions):
