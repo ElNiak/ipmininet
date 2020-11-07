@@ -307,10 +307,6 @@ class BGPConfig:
                     match_cond.append(RouteMapMatchCond('access-list', f.name, f.family))
                     if f not in access_lists:
                         access_lists.append(f)
-            elif isinstance(f, AccessList):
-                match_cond.append(RouteMapMatchCond('access-list', f.name))
-                if f not in access_lists:
-                    access_lists.append(f)
             else:
                 raise Exception("Filter not yet implemented")
         return match_cond
@@ -471,11 +467,23 @@ class AddressFamily:
     """An address family that is exchanged through BGP"""
 
     def __init__(self, af_name: str, redistribute: Sequence[str] = (),
-                 networks: Sequence[Union[str, IPv4Network, IPv6Network]] = ()):
+                 networks: Sequence[Union[str, IPv4Network, IPv6Network]] = ()
+                 routes=()):
         self.name = af_name
         self.networks = [ip_network(str(n)) for n in networks]
         self.redistribute = redistribute
         self.neighbors = []  # type: List[Peer]
+        @property
+    def family(self):
+        """
+        :return: the AddressFamily to be used in FRRouting configuration
+        """
+        if self.name == 'ipv4':
+            return 'ip'
+        elif self.name == 'ipv6':
+            return 'ip6'
+        else:
+            ValueError("Unsupported AddressFamily %s" % self.name)
 
 
 def AF_INET(*args, **kwargs):
