@@ -253,7 +253,7 @@ class RouteMapMatchCond:
     A class representing a RouteMap matching condition
     """
 
-    def __init__(self, cond_type: str, condition, family=None):
+    def __init__(self, cond_type: str, condition, family: Optional[str]=None):
         """
         :param condition: Can be an ip address, the id of an access
                           or prefix list
@@ -267,6 +267,17 @@ class RouteMapMatchCond:
         self.condition = condition
         self.cond_type = cond_type
         self.family = family
+
+    @property
+    def zebra_family(self):
+        if self.family == 'ipv4':
+            return 'ip'
+        elif self.family == 'ipv6':
+            return 'ipv6'
+        elif self.family == 'community':
+            return 'community'
+
+        raise ValueError('Unsupported family; %s' % self.family)
 
     def __eq__(self, other):
         return self.condition == other.condition \
