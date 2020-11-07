@@ -139,17 +139,6 @@ def ebgp_session(topo: 'IPTopo', a: 'RouterDescription', b: 'RouterDescription',
                       order=15)\
                 .permit('export-to-up-' + b, to_peer=b, order=20)
 
-    else:  # recent version of BGP must define import/export filters for eBGP sessions (RFC 8212)
-        ip4_pfxl = PrefixList(name="hello-world-v4", family='ipv4', entries=(PrefixListEntry('0.0.0.0/0', le=32),))
-        ip6_pfxl = PrefixList(name="hello-world-v6", family='ipv6', entries=(PrefixListEntry('::/0', le=128),))
-
-        a.get_config(BGP) \
-            .filter('import-all', policy=PERMIT, from_peer=a, to_peer=b) \
-            .filter('export-all', policy=PERMIT, from_peer=b, to_peer=a)
-        b.get_config(BGP) \
-            .filter('import-all2', policy=PERMIT, from_peer=a, to_peer=b, matching=(ip4_pfxl, ip6_pfxl)) \
-            .filter('export-all2', policy=PERMIT, from_peer=b, to_peer=a, matching=(ip4_pfxl, ip6_pfxl))
-
     bgp_peering(topo, a, b)
     topo.linkInfo(a, b)['igp_passive'] = True
 
