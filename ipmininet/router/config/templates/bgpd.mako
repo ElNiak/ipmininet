@@ -60,7 +60,7 @@ router bgp ${node.bgpd.asn}
 
 % for al in node.bgpd.access_lists:
     % for e in al.entries:
-ip access-list ${al.name} ${e.action} ${e.prefix}
+access-list ${al.name} ${e.action} ${e.prefix}
     % endfor
 % endfor
 
