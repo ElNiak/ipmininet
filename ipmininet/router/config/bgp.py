@@ -502,7 +502,7 @@ class Peer:
         self.nh_self = 'next-hop-self'
         # We enable eBGP multihop if eBGP is in use (before)
         self.ebgp     = self.asn != base.asn
-        self.ebgp_multihop = ebgp # ebgp => Not compatible with ttl security, not needed to multihop ebgp sessions in our case
+        self.ebgp_multihop = self.ebgp # ebgp => Not compatible with ttl security, not needed to multihop ebgp sessions in our case
         self.description = '%s (%sBGP)' % (node, 'e' if self.ebgp else 'i')
         
         #Chris:[no] neighbor PEER ttl-security hops NUMBER
