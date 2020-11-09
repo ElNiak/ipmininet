@@ -18,7 +18,7 @@ router bgp ${node.bgpd.asn}
     neighbor ${n.peer} remote-as ${n.asn}
     neighbor ${n.peer} port ${n.port}
     neighbor ${n.peer} description ${n.description}
-    % if n.ebgp_multihop:
+    % if n.ebgp_multihop and not n.security:
     neighbor ${n.peer} ebgp-multihop
     % endif
     % if n.security:
