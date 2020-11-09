@@ -54,13 +54,14 @@ router bgp ${node.bgpd.asn}
         % endif
     % endfor
     % if node.bgpd.rr:
-    bgp cluster-id 10.0.0.0
+    bgp cluster-id ${node.bgpd.routerid}
     % endif
 % endfor
 
 % for al in node.bgpd.access_lists:
     % for e in al.entries:
 access-list ${al.name} ${e.action} ${e.prefix}
+ip access-list ${al.name} ${e.action} ${e.prefix}
     % endfor
 % endfor
 
