@@ -22,7 +22,7 @@ router bgp ${node.bgpd.asn}
     neighbor ${n.peer} ebgp-multihop
     % endif
     % if n.security:
-    
+    neighbor ${n.peer} ttl-security hops ${n.nhop_sec}
     % if n.ebgp:
 	neighbor ${n.peer} maximum-prefix 160
     % endif
@@ -54,7 +54,7 @@ router bgp ${node.bgpd.asn}
         % endif
     % endfor
     % if node.bgpd.rr:
-        bgp cluster-id 10.0.0.0
+        bgp cluster-id ${node.bgpd.routerid}
     % endif
 % endfor
 
