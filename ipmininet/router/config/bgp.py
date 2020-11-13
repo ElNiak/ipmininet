@@ -517,18 +517,20 @@ class Peer:
             -> Tuple[Optional[str], Optional['Router']]:
         """Return the IP address that base should try to contact to establish
         a peering"""
-        visited = set()  # type: Set[IPIntf]
+        visited = set()  # type: Set[str]
         to_visit = {i.name: i for i in realIntfList(base)}
         prio_queue = [(0, i) for i in to_visit.keys()]
         heapq.heapify(prio_queue)
         # Explore all interfaces in base ASN recursively, until we find one
         # connected to the peer
         while to_visit:
-            path_cost, i = heapq.heappop(prio_queue)
-            if i in visited:
+            node = heapq.heappop(prio_queue)
+            path_cost = node.key[0]
+            i = j = node.key[1]
+            if j in visited:
                 continue
             i = to_visit.pop(i)
-            visited.add(i)
+            visited.add(j)  # putting the string representation of the interface
             for n in i.broadcast_domain.routers:
                 if n.node.name == peer:
                     if not v6:
