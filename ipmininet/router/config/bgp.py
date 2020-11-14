@@ -508,8 +508,8 @@ class Peer:
         #Chris:[no] neighbor PEER ttl-security hops NUMBER
         #Chris:[no] neighbor PEER password PASSWORD
         #Chris:     neighbor PEER maximum-prefix NUMBER
-        self.security = False  #TODO change dynamically
-        self.nhop_sec = 4     # TTL = 252
+        self.security = True  #TODO change dynamically
+        self.nhop_sec = 5     # TTL = 252
 
 
     @staticmethod
