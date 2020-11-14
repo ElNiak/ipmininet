@@ -21,7 +21,7 @@ router bgp ${node.bgpd.asn}
     % if n.ebgp_multihop and not n.security:
     neighbor ${n.peer} ebgp-multihop
     % endif
-    % if n.security:
+    % if n.security and node.bgpd.asn == "16276":
     neighbor ${n.peer} ttl-security hops ${n.nhop_sec}
     % if n.ebgp:
 	neighbor ${n.peer} maximum-prefix 160
