@@ -164,6 +164,23 @@ class BGPConfig:
                             matching=matching, direction='in')
         return self
 
+    def set_prepend(self, size: int, asn: int, to_peer: str,
+                       matching: Sequence[Union[AccessList, CommunityList]] =
+                       ()) -> 'BGPConfig':
+        """Set preprend fir an asn on a peering with 'from_peer' on routes
+         matching all of the access and community lists in 'matching'
+
+        :param size: The local pref value to set
+        :param from_peer: The peer on which the local pref is applied
+        :param matching: A list of AccessList and/or CommunityList
+        :return: self
+        """
+        self.add_set_action(peer=to_peer,
+                            set_action=RouteMapSetAction('as-path prepend',
+                                                         (str(asn)+" ")*size),
+                            matching=matching, direction='out')
+        return self
+
     def set_med(self, med: int, to_peer: str,
                 matching: Sequence[Union[AccessList, CommunityList]] = ()) \
             -> 'BGPConfig':
@@ -509,7 +526,7 @@ class Peer:
         #Chris:[no] neighbor PEER password PASSWORD
         #Chris:     neighbor PEER maximum-prefix NUMBER
         self.security = True  #TODO change dynamically
-        self.nhop_sec = 4     #TTL = 252
+        self.nhop_sec = 2     #TTL = 252
 
 
     @staticmethod
