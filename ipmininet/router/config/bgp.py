@@ -170,8 +170,9 @@ class BGPConfig:
         """Set preprend fir an asn on a peering with 'from_peer' on routes
          matching all of the access and community lists in 'matching'
 
-        :param size: The local pref value to set
-        :param from_peer: The peer on which the local pref is applied
+        :param size: The amount of times the asn is prepended
+        :param asn: The asn to prepend
+        :param to_peer: The peer on which the prepending is applied
         :param matching: A list of AccessList and/or CommunityList
         :return: self
         """
@@ -526,7 +527,7 @@ class Peer:
         #Chris:[no] neighbor PEER password PASSWORD
         #Chris:     neighbor PEER maximum-prefix NUMBER
         self.security = True  #TODO change dynamically
-        self.nhop_sec = 2     #TTL = 252
+        self.nhop_sec = 4     #TTL = 252
 
 
     @staticmethod
