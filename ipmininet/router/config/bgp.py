@@ -178,7 +178,10 @@ class BGPConfig:
         """
         set_action = RouteMapSetAction('as-path prepend',(str(asn)+" ")*size)
         route_maps=self.topo.getNodeInfo(self.router, 'bgp_route_maps', list)
-        print(self.filters_to_match_cond(matching))
+        print(self.filters_to_match_cond(matching)[0].condition)
+        print(self.filters_to_match_cond(matching)[0].cond_type)
+        print(self.filters_to_match_cond(matching)[1].condition)
+        print(self.filters_to_match_cond(matching)[1].cond_type)
         route_maps.append({
                 'peer': to_peer,
                 'match_cond': self.filters_to_match_cond(matching),
