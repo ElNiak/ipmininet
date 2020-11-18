@@ -351,11 +351,11 @@ class BGPConfig:
         if name is None:
             route_maps.append(
             {'peer': peer, 'match_cond': match_cond, 'order': order,
-             'set_actions': [set_action], 'direction': direction, 'name': name})
+             'set_actions': [set_action], 'direction': direction})
         else:
             route_maps.append(
             {'peer': peer, 'match_cond': match_cond, 'order': order,
-             'set_actions': [set_action], 'direction': direction})
+             'set_actions': [set_action], 'direction': direction, 'name': name})
         
         return self
 
