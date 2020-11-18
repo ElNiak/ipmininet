@@ -192,6 +192,10 @@ class Router(IPNode, L3Router):
                  password='zebra',
                  lo_addresses: Sequence[Union[str, IPv4Interface,
                                               IPv6Interface]] = (),
+                 lo1_addresses: Sequence[Union[str, IPv4Interface,
+                                              IPv6Interface]] = (),
+                 lo2_addresses: Sequence[Union[str, IPv4Interface,
+                                              IPv6Interface]] = (),
                  *args, **kwargs):
         """:param password: The password for the routing daemons vtysh access
            :param lo_addresses: The list of addresses to set on the loopback
@@ -203,6 +207,13 @@ class Router(IPNode, L3Router):
         # so no need to move it
         lo = IPIntf('lo', node=self, port=-1, moveIntfFn=lambda x, y: None)
         lo.ip = lo_addresses
+
+        if lo2_addresses != ():
+            lo2 = IPIntf('lo:2', node=self, port=-1, moveIntfFn=lambda x, y: None)
+            lo2.ip = lo2_addresses
+        if lo1_addresses != ():
+            lo1 = IPIntf('lo:1', node=self, port=-1, moveIntfFn=lambda x, y: None)
+            lo1.ip = lo1_addresses
 
     @property
     def asn(self) -> int:
