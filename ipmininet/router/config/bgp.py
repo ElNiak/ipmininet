@@ -147,7 +147,7 @@ class BGPConfig:
         self.topo = topo
         self.router = router
 
-    def set_local_pref(self, local_pref: int, from_peer: str,
+    def set_local_pref(self, local_pref: int, from_peer: str, order=10,
                        matching: Sequence[Union[AccessList, CommunityList]] =
                        ()) -> 'BGPConfig':
         """Set local pref on a peering with 'from_peer' on routes
@@ -161,7 +161,7 @@ class BGPConfig:
         self.add_set_action(peer=from_peer,
                             set_action=RouteMapSetAction('local-preference',
                                                          local_pref),
-                            matching=matching, direction='in')
+                            matching=matching, direction='in', order=order)
         return self
 
     def set_prepend(self, name: str, order: int, size: int, asn: int, to_peer: str,
@@ -334,9 +334,9 @@ class BGPConfig:
                 raise Exception("Filter not yet implemented")
         return match_cond
 
-    def add_set_action(self, peer: str, set_action: RouteMapSetAction,
+    def add_set_action(self, peer: str, set_action: RouteMapSetAction, 
                        matching: Sequence[Union[AccessList, CommunityList]],
-                       direction: str) -> 'BGPConfig':
+                       direction: str,order=10) -> 'BGPConfig':
         """Add a 'RouteMapSetAction' to a BGP peering between two nodes
 
         :param peer: The peer to which the route map is applied
@@ -348,7 +348,7 @@ class BGPConfig:
         match_cond = self.filters_to_match_cond(matching)
         route_maps = self.topo.getNodeInfo(self.router, 'bgp_route_maps', list)
         route_maps.append(
-            {'peer': peer, 'match_cond': match_cond,
+            {'peer': peer, 'match_cond': match_cond, 'order': order,
              'set_actions': [set_action], 'direction': direction})
         return self
 
