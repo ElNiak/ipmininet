@@ -71,7 +71,6 @@ ip community-list standard ${cl.name} ${cl.action} ${cl.community}
 % for rm in node.bgpd.route_maps:
 route-map ${rm.name}-${rm.neighbor.family} ${rm.match_policy} ${rm.order}
         %for match in rm.match_cond:
-        % print(match.condition)
             %if match.cond_type == "access-list":
     match ${ip_statement(rm.neighbor.peer)} address ${match.condition}
             %elif match.cond_type == "prefix-list" or match.cond_type =='next-hop':

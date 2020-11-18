@@ -111,14 +111,14 @@ def ebgp_session(topo: 'IPTopo', a: 'RouterDescription', b: 'RouterDescription',
                       order=10)\
                 .deny('export-to-peer-' + b, to_peer=b, matching=(peers_link,),
                       order=15)\
-                .permit('export-to-peer-' + b, to_peer=b, order=20)
+                .permit('export-to-peer-' + b, to_peer=b, order=25)
 
             b.get_config(BGP)\
                 .deny('export-to-peer-' + a, to_peer=a, matching=(up_link,),
                       order=10)\
                 .deny('export-to-peer-' + a, to_peer=a, matching=(peers_link,),
                       order=15)\
-                .permit('export-to-peer-' + a, to_peer=a, order=20)
+                .permit('export-to-peer-' + a, to_peer=a, order=25)
 
         elif link_type == CLIENT_PROVIDER:
             # Set the community and local pref for the import policy
@@ -135,7 +135,7 @@ def ebgp_session(topo: 'IPTopo', a: 'RouterDescription', b: 'RouterDescription',
                       order=10)\
                 .deny('export-to-up-' + b, to_peer=b, matching=(peers_link,),
                       order=15)\
-                .permit('export-to-up-' + b, to_peer=b, order=20)
+                .permit('export-to-up-' + b, to_peer=b, order=25)
 
     bgp_peering(topo, a, b)
     topo.linkInfo(a, b)['igp_passive'] = True
@@ -178,10 +178,6 @@ class BGPConfig:
         """
         set_action = RouteMapSetAction('as-path prepend',(str(asn)+" ")*size)
         route_maps=self.topo.getNodeInfo(self.router, 'bgp_route_maps', list)
-        print(self.filters_to_match_cond(matching)[0].condition)
-        print(self.filters_to_match_cond(matching)[0].cond_type)
-        print(self.filters_to_match_cond(matching)[1].condition)
-        print(self.filters_to_match_cond(matching)[1].cond_type)
         route_maps.append({
                 'peer': to_peer,
                 'match_cond': self.filters_to_match_cond(matching),
