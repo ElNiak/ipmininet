@@ -209,10 +209,10 @@ class Router(IPNode, L3Router):
         lo.ip = lo_addresses
 
         if lo2_addresses != ():
-            lo2 = IPIntf('lo:2', node=self, port=-1, moveIntfFn=lambda x, y: None)
+            lo2 = IPIntf('lo:1', node=self, port=-1, moveIntfFn=lambda x, y: None)
             lo2.ip = lo2_addresses
         if lo1_addresses != ():
-            lo1 = IPIntf('lo:1', node=self, port=-1, moveIntfFn=lambda x, y: None)
+            lo1 = IPIntf('lo:0', node=self, port=-1, moveIntfFn=lambda x, y: None)
             lo1.ip = lo1_addresses
 
     @property
