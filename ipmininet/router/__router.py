@@ -208,6 +208,7 @@ class Router(IPNode, L3Router):
         lo = IPIntf('lo', node=self, port=-1, moveIntfFn=lambda x, y: None)
         lo.ip = lo_addresses
 
+        #not working
         if lo2_addresses != ():
             lo2 = IPIntf('lo:1', node=self, port=-1, moveIntfFn=lambda x, y: None)
             lo2.ip = lo2_addresses

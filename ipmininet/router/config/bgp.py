@@ -1,7 +1,7 @@
 """Base classes to configure a BGP daemon"""
 import heapq
 from typing import Sequence, TYPE_CHECKING, Optional, Union, Tuple, List, Set
-import os #chris
+import os  # chris
 import itertools
 
 from ipaddress import ip_network, ip_address, IPv4Network, IPv6Network
@@ -164,7 +164,7 @@ class BGPConfig:
                             matching=matching, direction='in')
         return self
 
-    def set_prepend(self, size: int, asn: int, to_peer: str,
+    def set_prepend(self, name: str, order: int, size: int, asn: int, to_peer: str,
                        matching: Sequence[Union[AccessList, CommunityList]] =
                        ()) -> 'BGPConfig':
         """Set preprend fir an asn on a peering with 'from_peer' on routes
@@ -176,10 +176,16 @@ class BGPConfig:
         :param matching: A list of AccessList and/or CommunityList
         :return: self
         """
-        self.add_set_action(peer=to_peer,
-                            set_action=RouteMapSetAction('as-path prepend',
-                                                         (str(asn)+" ")*size),
-                            matching=matching, direction='out')
+        set_action = RouteMapSetAction('as-path prepend',(str(asn)+" ")*size)
+        route_maps=self.topo.getNodeInfo(self.router, 'bgp_route_maps', list)
+        route_maps.append({
+                'peer': to_peer,
+                'match_cond': self.filters_to_match_cond(matching),
+                'direction': 'out',
+                'name': name,
+                'order': order,
+                'set_actions': [set_action]
+            })
         return self
 
     def set_med(self, med: int, to_peer: str,
@@ -523,9 +529,9 @@ class Peer:
         self.ebgp_multihop = self.ebgp # ebgp => Not compatible with ttl security, not needed to multihop ebgp sessions in our case
         self.description   = '%s (%sBGP)' % (node, 'e' if self.ebgp else 'i')
         
-        #Chris:[no] neighbor PEER ttl-security hops NUMBER
-        #Chris:[no] neighbor PEER password PASSWORD
-        #Chris:     neighbor PEER maximum-prefix NUMBER
+        # Chris:[no] neighbor PEER ttl-security hops NUMBER
+        # Chris:[no] neighbor PEER password PASSWORD
+        # Chris:     neighbor PEER maximum-prefix NUMBER
         self.security = True  #TODO change dynamically
         self.nhop_sec = 3     #TTL = 252
 
