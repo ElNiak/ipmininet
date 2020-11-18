@@ -208,6 +208,7 @@ class BGPConfig:
                       from_peer: Optional[str] = None,
                       to_peer: Optional[str] = None,
                       name:Optional[str]=None,
+                      order= 10,
                       matching: Sequence[Union[AccessList, CommunityList]] =
                       ()) -> 'BGPConfig':
         """Set community on a routes received from 'from_peer'
