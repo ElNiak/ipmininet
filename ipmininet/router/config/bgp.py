@@ -99,11 +99,11 @@ def ebgp_session(topo: 'IPTopo', a: 'RouterDescription', b: 'RouterDescription',
         if link_type == SHARE:
             # Set the community and local pref for the import policy
             a.get_config(BGP)\
-                .set_community(1, from_peer=b, matching=(all_al,)) \
-                .set_local_pref(150, from_peer=b, matching=(all_al,))
+                .set_community(1, from_peer=b, matching=(all_al,), name='import-from-peer' + b) \
+                .set_local_pref(150, from_peer=b, matching=(all_al,), name='import-from-peer' + b)
             b.get_config(BGP)\
-                .set_community(1, from_peer=a, matching=(all_al,))\
-                .set_local_pref(150, from_peer=a, matching=(all_al,))
+                .set_community(1, from_peer=a, matching=(all_al,), name='import-from-peer' + b)\
+                .set_local_pref(150, from_peer=a, matching=(all_al,), name='import-from-peer' + b)
 
             # Create route maps to filter exported route
             a.get_config(BGP)\
@@ -123,11 +123,11 @@ def ebgp_session(topo: 'IPTopo', a: 'RouterDescription', b: 'RouterDescription',
         elif link_type == CLIENT_PROVIDER:
             # Set the community and local pref for the import policy
             a.get_config(BGP)\
-                .set_community(3, from_peer=b, matching=(all_al,)) \
-                .set_local_pref(100, from_peer=b, matching=(all_al,))
+                .set_community(3, from_peer=b, matching=(all_al,), name='import-from-up' + b) \
+                .set_local_pref(100, from_peer=b, matching=(all_al,), name='import-from-up' + b)
             b.get_config(BGP)\
-                .set_community(2, from_peer=a, matching=(all_al,))\
-                .set_local_pref(200, from_peer=a, matching=(all_al,))
+                .set_community(2, from_peer=a, matching=(all_al,), name='import-from-down' + b)\
+                .set_local_pref(200, from_peer=a, matching=(all_al,), name='import-from-down'+ b)
 
             # Create route maps to filter exported route
             a.get_config(BGP)\
@@ -147,7 +147,7 @@ class BGPConfig:
         self.topo = topo
         self.router = router
 
-    def set_local_pref(self, local_pref: int, from_peer: str, order=10,
+    def set_local_pref(self, local_pref: int, from_peer: str, order=10, name:Optional[str]=None,
                        matching: Sequence[Union[AccessList, CommunityList]] =
                        ()) -> 'BGPConfig':
         """Set local pref on a peering with 'from_peer' on routes
@@ -161,7 +161,7 @@ class BGPConfig:
         self.add_set_action(peer=from_peer,
                             set_action=RouteMapSetAction('local-preference',
                                                          local_pref),
-                            matching=matching, direction='in', order=order)
+                            matching=matching, direction='in', order=order,name=name)
         return self
 
     def set_prepend(self, name: str, order: int, size: int, asn: int, to_peer: str,
@@ -207,6 +207,7 @@ class BGPConfig:
     def set_community(self, community: Union[str, int],
                       from_peer: Optional[str] = None,
                       to_peer: Optional[str] = None,
+                      name:Optional[str]=None,
                       matching: Sequence[Union[AccessList, CommunityList]] =
                       ()) -> 'BGPConfig':
         """Set community on a routes received from 'from_peer'
@@ -224,12 +225,12 @@ class BGPConfig:
             self.add_set_action(peer=to_peer,
                                 set_action=RouteMapSetAction('community',
                                                              community),
-                                matching=matching, direction='out')
+                                matching=matching, direction='out',name=name)
         if from_peer is not None:
             self.add_set_action(peer=from_peer,
                                 set_action=RouteMapSetAction('community',
                                                              community),
-                                matching=matching, direction='in')
+                                matching=matching, direction='in',name=name)
         return self
 
     def filter(self, name: Optional[str] = None, policy=DENY,
@@ -336,7 +337,7 @@ class BGPConfig:
 
     def add_set_action(self, peer: str, set_action: RouteMapSetAction, 
                        matching: Sequence[Union[AccessList, CommunityList]],
-                       direction: str,order=10) -> 'BGPConfig':
+                       direction: str, order=10, name:Optional[str]=None) -> 'BGPConfig':
         """Add a 'RouteMapSetAction' to a BGP peering between two nodes
 
         :param peer: The peer to which the route map is applied
@@ -347,9 +348,15 @@ class BGPConfig:
         """
         match_cond = self.filters_to_match_cond(matching)
         route_maps = self.topo.getNodeInfo(self.router, 'bgp_route_maps', list)
-        route_maps.append(
+        if name is None:
+            route_maps.append(
+            {'peer': peer, 'match_cond': match_cond, 'order': order,
+             'set_actions': [set_action], 'direction': direction, 'name': name})
+        else:
+            route_maps.append(
             {'peer': peer, 'match_cond': match_cond, 'order': order,
              'set_actions': [set_action], 'direction': direction})
+        
         return self
 
 
