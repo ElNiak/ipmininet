@@ -226,12 +226,12 @@ class BGPConfig:
             self.add_set_action(peer=to_peer,
                                 set_action=RouteMapSetAction('community',
                                                              community),
-                                matching=matching, direction='out',name=name)
+                                matching=matching, direction='out', name=name, order=order)
         if from_peer is not None:
             self.add_set_action(peer=from_peer,
                                 set_action=RouteMapSetAction('community',
                                                              community),
-                                matching=matching, direction='in',name=name)
+                                matching=matching, direction='in',name=name, order=order)
         return self
 
     def filter(self, name: Optional[str] = None, policy=DENY,
