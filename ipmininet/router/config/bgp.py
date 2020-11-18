@@ -99,11 +99,11 @@ def ebgp_session(topo: 'IPTopo', a: 'RouterDescription', b: 'RouterDescription',
         if link_type == SHARE:
             # Set the community and local pref for the import policy
             a.get_config(BGP)\
-                .set_community(1, from_peer=b, matching=(all_al,), name='import-from-peer' + b) \
-                .set_local_pref(150, from_peer=b, matching=(all_al,), name='import-from-peer' + b)
+                .set_community(1, from_peer=b, matching=(all_al,), name='import-from-peer-' + b) \
+                .set_local_pref(150, from_peer=b, matching=(all_al,), name='import-from-peer-' + b)
             b.get_config(BGP)\
-                .set_community(1, from_peer=a, matching=(all_al,), name='import-from-peer' + b)\
-                .set_local_pref(150, from_peer=a, matching=(all_al,), name='import-from-peer' + b)
+                .set_community(1, from_peer=a, matching=(all_al,), name='import-from-peer-' + b)\
+                .set_local_pref(150, from_peer=a, matching=(all_al,), name='import-from-peer-' + b)
 
             # Create route maps to filter exported route
             a.get_config(BGP)\
@@ -123,11 +123,11 @@ def ebgp_session(topo: 'IPTopo', a: 'RouterDescription', b: 'RouterDescription',
         elif link_type == CLIENT_PROVIDER:
             # Set the community and local pref for the import policy
             a.get_config(BGP)\
-                .set_community(3, from_peer=b, matching=(all_al,), name='import-from-up' + b) \
-                .set_local_pref(100, from_peer=b, matching=(all_al,), name='import-from-up' + b)
+                .set_community(3, from_peer=b, matching=(all_al,), name='import-from-up-' + b) \
+                .set_local_pref(100, from_peer=b, matching=(all_al,), name='import-from-up-' + b)
             b.get_config(BGP)\
-                .set_community(2, from_peer=a, matching=(all_al,), name='import-from-down' + b)\
-                .set_local_pref(200, from_peer=a, matching=(all_al,), name='import-from-down'+ b)
+                .set_community(2, from_peer=a, matching=(all_al,), name='import-from-down-' + b)\
+                .set_local_pref(200, from_peer=a, matching=(all_al,), name='import-from-down-'+ b)
 
             # Create route maps to filter exported route
             a.get_config(BGP)\
