@@ -20,6 +20,7 @@ router bgp ${node.bgpd.asn}
     neighbor ${n.peer} description ${n.description}
     % if n.security and node.bgpd.asn == 16276 and n.ebgp:
     neighbor ${n.peer} ttl-security hops ${n.nhop_sec}
+    neighbor ${n.peer} password myStrongPassword 
     % elif n.ebgp_multihop:
     neighbor ${n.peer} ebgp-multihop
         % if n.ebgp:
