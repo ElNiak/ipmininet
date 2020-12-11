@@ -4,10 +4,15 @@ from ipmininet.cli import IPCLI
 from ipmininet.ipnet import IPNet
 from ipmininet.iptopo import IPTopo
 from ipmininet.router.config import (AF_INET, AF_INET6, BGP, OSPF, OSPF6,RIPng,
-                                     SHARE, RouterConfig, bgp_fullmesh,
-                                     ebgp_session, set_rr, AccessList, CLIENT_PROVIDER)
+                                     RouterConfig, bgp_fullmesh,IP6Tables,IPTables,
+                                     ebgp_session, set_rr, AccessList)
 from ipmininet.router.config.zebra import AccessListEntry, CommunityList, PERMIT, DENY
 from link_params import LINK_PARAMS
+from firewall import ip6_rules,ip4_rules,port_restriction,port_restriction_cmd
+
+SHARE = "peer"
+PROVIDER = "up"
+CLIENT = "down"
 
 class OSPFNetOVH(IPTopo):
 
@@ -247,7 +252,7 @@ class OSPFNetOVH(IPTopo):
         ###########################################
 
         self.addLinks(
-                     # ADD links between the routers and (hosts)
+                     # ADD links between the routers (and hosts)
                     (rr1_lon1,rr1_lon2, self.link_params.get('rr1_lon1,rr1_lon2', {})), (rr1_lon1,r_gra1,  self.link_params.get('rr1_lon1,r_gra1', {})),    (rr1_lon1,rr1_nwk1, self.link_params.get('rr1_lon1,rr1_nwk1', {})), (rr1_lon1,r_rbx1, self.link_params.get('rr1_lon1,r_rbx1', {})), (rr1_lon1,h1_lon, self.link_params.get('rr1_lon1,h1_lon', {})),
                     (rr1_lon2,r_gra2,   self.link_params.get('rr1_lon2,r_gra2', {})),   (rr1_lon2,r_rbx2,  self.link_params.get('rr1_lon2,r_rbx2', {})),    (rr1_lon2,rr1_nwk2, self.link_params.get('rr1_lon2,rr1_nwk2', {})),
                     (r_gra1,r_gra2,     self.link_params.get('r_gra1,r_gra2', {})),     (r_gra1,rr2_par1,  self.link_params.get('r_gra1,rr2_par1', {})),    (r_gra1,h1_gra,     self.link_params.get('r_gra1,h1_gra', {})),
@@ -275,6 +280,7 @@ class OSPFNetOVH(IPTopo):
         self.addLinks(
                     #For ANYCAST
 		            (rr2_bhs2, r_any1, self.link_params.get('rr2_bhs2,r_any1', {})),  (r_gra2, r_any2,   self.link_params.get('r_gra2,r_any2', {})),
+		            (rr2_bhs1, r_any1, self.link_params.get('rr2_bhs1,r_any1', {})),  (r_gra1, r_any2,   self.link_params.get('r_gra1,r_any2', {})), # backup link
                     (r_any1, serv1_any,self.link_params.get('r_any1,serv1_any', {})), (r_any2, serv2_any,self.link_params.get('r_any2,serv2_any', {}))
         )
 
@@ -307,7 +313,86 @@ class OSPFNetOVH(IPTopo):
         #EBGP Session Google (Stub)
         ebgp_session(self, rr2_par1, r_google)
         ebgp_session(self, r_ymq1,   r_google)
+
+        ###########################################
+        ###       Add firewall                  ###
+        ###########################################
+
+        routers_interface_external = [
+            [
+                ("rr1_lon1","8"), #amazon
+                ("rr1_lon1","5"), #cogent
+                ("rr1_lon1","6"), #level3
+                ("rr1_lon1","7") #telia
+            ],
+            [
+                ("rr1_nwk1","4"), #cogent
+                ("rr1_nwk1","5"), #level3
+                ("rr1_nwk1","6")  #telia
+            ],
+            [
+                ("rr1_nwk2","3"), #cogent
+                ("rr1_nwk2","4"), #level3
+                ("rr1_nwk2","5")  #telia
+            ],
+            [
+                ("rr2_par1","4"), #cogent
+                ("rr2_par1","5"), #level3
+                ("rr2_par1","6")  #google
+            ],
+            [
+                ("rr2_par2","3") #amazon
+            ],
+            [
+                ("r_ymq1","3"), #amazon
+                ("r_ymq1","4")  #google
+            ]
+        ]
         
+        #Not working: ip6_rules["no_external_ospf"]+ip6_rules["no_multicast"]+ip6_rules["loopback_spoofing"]
+        ip6_r  = ip6_rules["anti_spoofing"]+ip6_rules["allow_http_to_public"]+ip6_rules["limit_con"]
+        ip6_r += ip6_rules["global_unical_address"]+ip6_rules["no_benchmarking"]+ip6_rules["limit_tcp_per_client"]
+        #Not working: ip4_rules["no_external_ospf"]+ip4_rules["no_multicast"]  +ip4_rules["loopback_spoofing"] 
+        ip4_r  = ip4_rules["anti_spoofing"]+ip4_rules["allow_http_to_public"]+ip4_rules["limit_con"]
+        ip4_r += ip4_rules["no_benchmarking"]+ip4_rules["no_external_hsrp"]+ip4_rules["limit_tcp_per_client"]
+
+        restriction = []
+        for routerInterface in routers_interface_external[0]:
+            restriction += port_restriction(routerInterface)
+        rr1_lon1.addDaemon(IP6Tables, rules=ip6_r+restriction)
+        rr1_lon1.addDaemon(IPTables, rules=ip4_r+restriction)
+
+
+        restriction = []
+        for routerInterface in routers_interface_external[1]:
+            restriction += port_restriction(routerInterface)
+        rr1_nwk1.addDaemon(IP6Tables, rules=ip6_r+restriction)
+        rr1_nwk1.addDaemon(IPTables, rules=ip4_r+restriction)
+
+        restriction = []
+        for routerInterface in routers_interface_external[2]:
+            restriction += port_restriction(routerInterface)
+        rr1_nwk2.addDaemon(IP6Tables, rules=ip6_r+restriction)
+        rr1_nwk2.addDaemon(IPTables,  rules=ip4_r+restriction)
+
+        restriction = []
+        for routerInterface in routers_interface_external[3]:
+            restriction += port_restriction(routerInterface)
+        rr2_par1.addDaemon(IP6Tables, rules=ip6_r+restriction)
+        rr2_par1.addDaemon(IPTables,  rules=ip4_r+restriction)
+
+        restriction = []
+        for routerInterface in routers_interface_external[4]:
+            restriction += port_restriction(routerInterface)
+        rr2_par2.addDaemon(IP6Tables, rules=ip6_r+restriction)
+        rr2_par2.addDaemon(IPTables,  rules=ip4_r+restriction)
+        
+
+        restriction = []
+        for routerInterface in routers_interface_external[5]:
+            restriction += port_restriction(routerInterface)
+        r_ymq1.addDaemon(IPTables,   rules=ip4_r+restriction)
+        r_ymq1.addDaemon(IP6Tables,  rules=ip6_r+restriction)
 
         ###########################################
         ###          Community  List            ###
@@ -316,13 +401,13 @@ class OSPFNetOVH(IPTopo):
         all_al = AccessList('All', ('any',))
         
         peers_link = CommunityList(name='from-peers', community=1, action=PERMIT)
-        up_link    = CommunityList(name='from-up', community=3, action=PERMIT)
+        up_link    = CommunityList(name='from-up',    community=3, action=PERMIT)
         
         learnt_from_na = CommunityList(name='learnt_from_na', community=4001, action=PERMIT)
         learnt_from_eu = CommunityList(name='learnt_from_eu', community=4201, action=PERMIT)
 
         customer_default = CommunityList(name='customer-default', community=490, action=PERMIT)
-        customer_backup  = CommunityList(name='customer-backup', community=480, action=PERMIT)
+        customer_backup  = CommunityList(name='customer-backup',  community=480, action=PERMIT)
         
         prepend_all_1 = CommunityList(name='prepend_all_1', community=421, action=PERMIT)
         prepend_all_2 = CommunityList(name='prepend_all_2', community=422, action=PERMIT)
@@ -336,115 +421,149 @@ class OSPFNetOVH(IPTopo):
         prepend_eu_2 = CommunityList(name='prepend_eu_2', community=4222, action=PERMIT)
         prepend_eu_3 = CommunityList(name='prepend_eu_3', community=4223, action=PERMIT)
         
-        no_advertise_all = CommunityList(name='no_advertise_all', community=429, action=PERMIT)
-        no_advertise_na  = CommunityList(name='no_advertise_na', community=4029, action=PERMIT)
-        no_advertise_eu  = CommunityList(name='no_advertise_eu', community=4229, action=PERMIT)
+        no_advertise_all = CommunityList(name='no_advertise_all', community=429,  action=PERMIT)
+        no_advertise_na  = CommunityList(name='no_advertise_na',  community=4029, action=PERMIT)
+        no_advertise_eu  = CommunityList(name='no_advertise_eu',  community=4229, action=PERMIT)
+
+        blackhole = CommunityList(name='blackhole', community=666, action=PERMIT)
 
         
-        border_router_eu   = [(rr1_lon1,r_cogent, CLIENT_PROVIDER),(rr1_lon1,r_amazon, SHARE),(rr1_lon1,r_telia, CLIENT_PROVIDER), (rr1_lon1,r_level3, CLIENT_PROVIDER),
-                              (rr2_par1, r_google, SHARE), (rr2_par1, r_cogent, CLIENT_PROVIDER), (rr2_par1, r_level3, CLIENT_PROVIDER),
+        border_router_eu   = [(rr1_lon1,r_cogent, PROVIDER),(rr1_lon1,r_amazon, SHARE),(rr1_lon1,r_telia, PROVIDER), (rr1_lon1,r_level3, PROVIDER),
+                              (rr2_par1, r_google, SHARE), (rr2_par1, r_cogent, PROVIDER), (rr2_par1, r_level3, PROVIDER),
                               (rr2_par2, r_amazon, SHARE)]
                               
         border_router_us   = [(r_ymq1,r_amazon, SHARE),(r_ymq1,r_google, SHARE),
-                              (rr1_nwk1,r_cogent, CLIENT_PROVIDER), (rr1_nwk1,r_level3, CLIENT_PROVIDER),(rr1_nwk1,r_telia, CLIENT_PROVIDER),
-                              (rr1_nwk2,r_cogent, CLIENT_PROVIDER),(rr1_nwk2,r_level3, CLIENT_PROVIDER), (rr1_nwk2,r_telia, CLIENT_PROVIDER)]
+                              (rr1_nwk1,r_cogent, PROVIDER), (rr1_nwk1,r_level3, PROVIDER),(rr1_nwk1,r_telia, PROVIDER),
+                              (rr1_nwk2,r_cogent, PROVIDER),(rr1_nwk2,r_level3, PROVIDER), (rr1_nwk2,r_telia, PROVIDER)]
         
         ###########################################
         ###          For european router        ###
         ###########################################
         for router,peer,link_type in border_router_eu:
                 ###########################################
-                ###          SHARE ebg                  ###
+                ###          SHARE ebgp                 ###
                 ###########################################
                 if link_type == SHARE:
-                    router.get_config(BGP).set_community(community = '16276:1 16276:4201', from_peer=peer, matching=(all_al,), name='import-from-peer-' + peer, order = 10)
-                    router.get_config(BGP).set_local_pref(150, from_peer=peer, matching=(all_al,), name='import-from-peer-' + peer, order = 10)
-                    peer.get_config(BGP).set_community(community = 1, from_peer=router, matching=(all_al,), name='import-from-peer-' + router, order = 10)
-                    peer.get_config(BGP).set_local_pref(150, from_peer=router, matching=(all_al,), name='import-from-peer-' + router, order = 10)
+                    router.get_config(BGP).set_community(name='import-from-peer-' + peer, community = '16276:1 16276:4201', from_peer=peer, matching=(all_al,), order = 10)
+                    router.get_config(BGP).set_local_pref(name='import-from-peer-' + peer, local_pref = 150, from_peer=peer, matching=(all_al,), order = 10)
+                    peer.get_config(BGP).set_community(name='import-from-peer-' + peer, community = 1, from_peer=router, matching=(all_al,), order = 10)
+                    peer.get_config(BGP).set_local_pref(name='import-from-peer-' + peer, local_pref = 150, from_peer=router, matching=(all_al,), order = 10)
                     
-                    router.get_config(BGP).deny('export-to-peer-' + peer, to_peer=peer, matching=(up_link,), order=10)
-                    router.get_config(BGP).deny('export-to-peer-' + peer, to_peer=peer, matching=(peers_link,), order=15)
-                    router.get_config(BGP).permit('export-to-peer-' + peer, to_peer=peer, matching=(all_al,), order=25)
+                    router.get_config(BGP).deny('export-to-peer-' + peer,   to_peer=peer, matching=(up_link,),    order=10)
+                    router.get_config(BGP).deny('export-to-peer-' + peer,   to_peer=peer, matching=(peers_link,), order=15)
+                    router.get_config(BGP).permit('export-to-peer-' + peer, to_peer=peer, matching=(all_al,),     order=25)
                     
-                    peer.get_config(BGP).deny('export-to-peer-' + router, to_peer=router, matching=(up_link,), order=10)
-                    peer.get_config(BGP).deny('export-to-peer-' + router, to_peer=router, matching=(peers_link,), order=15)
-                    peer.get_config(BGP).permit('export-to-peer-' + router, to_peer=router, matching=(all_al,), order=25)
+                    peer.get_config(BGP).deny('export-to-peer-' + router,   to_peer=router, matching=(up_link,),    order=10)
+                    peer.get_config(BGP).deny('export-to-peer-' + router,   to_peer=router, matching=(peers_link,), order=15)
+                    peer.get_config(BGP).permit('export-to-peer-' + router, to_peer=router, matching=(all_al,),     order=25)
                 ###########################################
-                ###          CLIENT_PROVIDER ebg        ###
+                ###          CLIENT_PROVIDER ebgp       ###
                 ###########################################    
-                elif link_type == CLIENT_PROVIDER:
-                    router.get_config(BGP).set_community(community = '16276:3 16276:4001', from_peer=peer, matching=(all_al,), name='import-from-up-' + peer, order = 10)
-                    router.get_config(BGP).set_local_pref(100, from_peer=peer, matching=(all_al,), name='import-from-up-' + peer, order = 10)
-                    peer.get_config(BGP).set_community(community = 2, from_peer=router, matching=(all_al,), name='import-from-down-' + router, order = 10)
-                    peer.get_config(BGP).set_local_pref(200, from_peer=router, matching=(all_al,), name='import-from-down-' + router, order = 10)
+                elif link_type == PROVIDER:
+                    router.get_config(BGP).set_community( name='import-from-up-' + peer, community = '16276:3 16276:4201', from_peer=peer, matching=(all_al,), order = 10)
+                    router.get_config(BGP).set_local_pref(name='import-from-up-' + peer, local_pref = 100, from_peer=peer, matching=(all_al,), order = 10)
+                    peer.get_config(BGP).set_community(   name='import-from-down-' + router, community = 2, from_peer=router, matching=(all_al,), order = 10)
+                    peer.get_config(BGP).set_local_pref(  name='import-from-down-' + router, local_pref = 200, from_peer=router, matching=(all_al,), order = 10)
                     
-                    router.get_config(BGP).deny('export-to-up-' + peer, to_peer=peer, matching=(up_link,), order=10)
-                    router.get_config(BGP).deny('export-to-up-' + peer, to_peer=peer, matching=(peers_link,), order=15)
-                    router.get_config(BGP).permit('export-to-up-' + peer, to_peer=peer, matching=(all_al,), order=25)
-                
+                    router.get_config(BGP).deny('export-to-up-' + peer,   to_peer=peer, matching=(up_link,),    order=10)
+                    router.get_config(BGP).deny('export-to-up-' + peer,   to_peer=peer, matching=(peers_link,), order=15)
+                    router.get_config(BGP).permit('export-to-up-' + peer, to_peer=peer, matching=(all_al,),     order=25)
+
+                elif link_type == CLIENT:
+                    router.get_config(BGP).set_community( name='import-from-down-' + peer, community = '16276:2 16276:4201', from_peer=peer, matching=(all_al,), order = 10)
+                    router.get_config(BGP).set_local_pref(name='import-from-down-' + peer, local_pref = 200, from_peer=peer, matching=(all_al,),  order = 10)
+                    peer.get_config(BGP).set_community(   name='import-from-up-' + router, community = 3, from_peer=router, matching=(all_al,),   order = 10)
+                    peer.get_config(BGP).set_local_pref(  name='import-from-up-' + router, local_pref = 100, from_peer=router, matching=(all_al,),order = 10)
+                    
+                    peer.get_config(BGP).deny('export-to-up-' + router,   to_peer=router, matching=(up_link,),    order=10)
+                    peer.get_config(BGP).deny('export-to-up-' + router,   to_peer=router, matching=(peers_link,), order=15)
+                    peer.get_config(BGP).permit('export-to-up-' + router, to_peer=router, matching=(all_al,),     order=25)
                 ###########################################
                 ###    Prepending and communities       ###
                 ###########################################
+                if link_type == CLIENT:
+                    router.get_config(BGP).deny('import-from'+link_type+'-'+peer, from_peer=peer, matching=(blackhole,), order=4)
 
-                router.get_config(BGP).set_local_pref(name = 'import-from-'+link_type+'-'+peer, local_pref = 240, from_peer=peer, matching=(customer_default,), order = 5)
-                router.get_config(BGP).set_local_pref(name = 'import-from-'+link_type+'-'+peer, local_pref = 220, from_peer=peer, matching=(customer_backup,), order = 6)
+                    router.get_config(BGP).set_local_pref(name = 'import-from-'+link_type+'-'+peer, local_pref = 240, from_peer=peer, matching=(customer_default,),order = 5)
+                    router.get_config(BGP).set_local_pref(name = 'import-from-'+link_type+'-'+peer, local_pref = 220, from_peer=peer, matching=(customer_backup,), order = 6)
                 
-                router.get_config(BGP).set_community(name = 'import-from-'+link_type+'-'+peer, community = 4201, from_peer=peer, matching=(customer_default,), order = 5)
-                router.get_config(BGP).set_community(name = 'import-from-'+link_type+'-'+peer, community = 4201, from_peer=peer, matching=(customer_backup,), order = 6)
+                    router.get_config(BGP).set_community(name = 'import-from-'+link_type+'-'+peer, community = 4201, from_peer=peer, matching=(customer_default,), order = 5)
+                    router.get_config(BGP).set_community(name = 'import-from-'+link_type+'-'+peer, community = 4201, from_peer=peer, matching=(customer_backup,),  order = 6)
+
         
                 router.get_config(BGP).deny('export-to-'+link_type+'-'+peer, to_peer = peer, matching=(no_advertise_all,), order=5)
-                router.get_config(BGP).deny('export-to-'+link_type+'-'+peer, to_peer = peer, matching=(no_advertise_eu,), order=6)
+                router.get_config(BGP).deny('export-to-'+link_type+'-'+peer, to_peer = peer, matching=(no_advertise_eu,),  order=6)
                 
                 router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=1, asn=16276, to_peer = peer, matching=(prepend_all_1,), order = 16)
                 router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=2, asn=16276, to_peer = peer, matching=(prepend_all_2,), order = 17)
                 router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=3, asn=16276, to_peer = peer, matching=(prepend_all_3,), order = 18)
-                router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=1, asn=16276, to_peer = peer, matching=(prepend_eu_1,), order = 19)
-                router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=2, asn=16276, to_peer = peer, matching=(prepend_eu_2,), order = 20)
-                router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=3, asn=16276, to_peer = peer, matching=(prepend_eu_3,), order = 21)
+                router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=1, asn=16276, to_peer = peer, matching=(prepend_eu_1,),  order = 19)
+                router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=2, asn=16276, to_peer = peer, matching=(prepend_eu_2,),  order = 20)
+                router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=3, asn=16276, to_peer = peer, matching=(prepend_eu_3,),  order = 21)
 
         ###########################################
         ###            For US router            ###
         ###########################################  
         for router,peer,link_type in border_router_us:
+                ###########################################
+                ###          SHARE ebgp                 ###
+                ###########################################
                 if link_type == SHARE:
-                    router.get_config(BGP).set_community(community = '16276:1 16276:4201', from_peer=peer, matching=(all_al,), name='import-from-peer-' + peer, order = 10)
-                    router.get_config(BGP).set_local_pref(150, from_peer=peer, matching=(all_al,), name='import-from-peer-' + peer, order = 10)
-                    peer.get_config(BGP).set_community(community = 1, from_peer=router, matching=(all_al,), name='import-from-peer-' + router, order = 10)
-                    peer.get_config(BGP).set_local_pref(150, from_peer=router, matching=(all_al,), name='import-from-peer-' + router, order = 10)
+                    router.get_config(BGP).set_community(name='import-from-peer-' + peer, community = '16276:1 16276:4001', from_peer=peer, matching=(all_al,), order = 10)
+                    router.get_config(BGP).set_local_pref(name='import-from-peer-' + peer, local_pref = 150, from_peer=peer, matching=(all_al,), order = 10)
+                    peer.get_config(BGP).set_community(name='import-from-peer-' + peer,  community = 1,    from_peer=router, matching=(all_al,), order = 10)
+                    peer.get_config(BGP).set_local_pref(name='import-from-peer-' + peer, local_pref = 150, from_peer=router, matching=(all_al,), order = 10)
                     
-                    router.get_config(BGP).deny('export-to-peer-' + peer, to_peer=peer, matching=(up_link,), order=10)
-                    router.get_config(BGP).deny('export-to-peer-' + peer, to_peer=peer, matching=(peers_link,), order=15)
-                    router.get_config(BGP).permit('export-to-peer-' + peer, to_peer=peer, matching=(all_al,), order=25)
+                    router.get_config(BGP).deny('export-to-peer-' + peer,   to_peer=peer, matching=(up_link,),    order=10)
+                    router.get_config(BGP).deny('export-to-peer-' + peer,   to_peer=peer, matching=(peers_link,), order=15)
+                    router.get_config(BGP).permit('export-to-peer-' + peer, to_peer=peer, matching=(all_al,),     order=25)
                     
-                    peer.get_config(BGP).deny('export-to-peer-' + router, to_peer=router, matching=(up_link,), order=10)
-                    peer.get_config(BGP).deny('export-to-peer-' + router, to_peer=router, matching=(peers_link,), order=15)
-                    peer.get_config(BGP).permit('export-to-peer-' + router, to_peer=router, matching=(all_al,), order=25)
+                    peer.get_config(BGP).deny('export-to-peer-' + router,   to_peer=router, matching=(up_link,),    order=10)
+                    peer.get_config(BGP).deny('export-to-peer-' + router,   to_peer=router, matching=(peers_link,), order=15)
+                    peer.get_config(BGP).permit('export-to-peer-' + router, to_peer=router, matching=(all_al,),     order=25)
+                ###########################################
+                ###          CLIENT_PROVIDER ebgp       ###
+                ###########################################   
+                elif link_type == PROVIDER:
+                    router.get_config(BGP).set_community( name='import-from-up-' + peer,     community = '16276:3 16276:4001', from_peer=peer, matching=(all_al,), order = 10)
+                    router.get_config(BGP).set_local_pref(name='import-from-up-' + peer,     local_pref = 100, from_peer=peer,  matching=(all_al,),  order = 10)
+                    peer.get_config(BGP).set_community(   name='import-from-down-' + router, community = 2,    from_peer=router, matching=(all_al,), order = 10)
+                    peer.get_config(BGP).set_local_pref(  name='import-from-down-' + router, local_pref = 200, from_peer=router, matching=(all_al,), order = 10)
                     
-                elif link_type == CLIENT_PROVIDER:
-                    router.get_config(BGP).set_community(community = '16276:3 16276:4001', from_peer=peer, matching=(all_al,), name='import-from-up-' + peer, order = 10)
-                    router.get_config(BGP).set_local_pref(100, from_peer=peer, matching=(all_al,), name='import-from-up-' + peer, order = 10)
-                    peer.get_config(BGP).set_community(community = 2, from_peer=router, matching=(all_al,), name='import-from-down-' + router, order = 10)
-                    peer.get_config(BGP).set_local_pref(200, from_peer=router, matching=(all_al,), name='import-from-down-' + router, order = 10)
-                    
-                    router.get_config(BGP).deny('export-to-up-' + peer, to_peer=peer, matching=(up_link,), order=10)
-                    router.get_config(BGP).deny('export-to-up-' + peer, to_peer=peer, matching=(peers_link,), order=15)
-                    router.get_config(BGP).permit('export-to-up-' + peer, to_peer=peer, matching=(all_al,), order=25)
+                    router.get_config(BGP).deny('export-to-up-' + peer,   to_peer=peer, matching=(up_link,),    order=10)
+                    router.get_config(BGP).deny('export-to-up-' + peer,   to_peer=peer, matching=(peers_link,), order=15)
+                    router.get_config(BGP).permit('export-to-up-' + peer, to_peer=peer, matching=(all_al,),     order=25)
                 
-                router.get_config(BGP).set_local_pref(name = 'import-from-'+link_type+'-'+peer, local_pref = 240, from_peer=peer, matching=(customer_default,), order = 5)
-                router.get_config(BGP).set_local_pref(name = 'import-from-'+link_type+'-'+peer, local_pref = 220, from_peer=peer, matching=(customer_backup,), order = 6)
+                elif link_type == CLIENT:
+                    router.get_config(BGP).set_community( name='import-from-down-' + peer, community = '16276:2 16276:4001', from_peer=peer, matching=(all_al,), order = 10)
+                    router.get_config(BGP).set_local_pref(name='import-from-down-' + peer, local_pref = 200, from_peer=peer,   matching=(all_al,), order = 10)
+                    peer.get_config(BGP).set_community(   name='import-from-up-' + router, community = 3,    from_peer=router, matching=(all_al,), order = 10)
+                    peer.get_config(BGP).set_local_pref(  name='import-from-up-' + router, local_pref = 100, from_peer=router, matching=(all_al,), order = 10)
+                    
+                    peer.get_config(BGP).deny('export-to-up-' + router,   to_peer=router, matching=(up_link,),    order=10)
+                    peer.get_config(BGP).deny('export-to-up-' + router,   to_peer=router, matching=(peers_link,), order=15)
+                    peer.get_config(BGP).permit('export-to-up-' + router, to_peer=router, matching=(all_al,),     order=25)
+                ###########################################
+                ###    Prepending and communities       ###
+                ###########################################
+                if link_type == CLIENT:
+                    router.get_config(BGP).deny('import-from'+link_type+'-'+peer, from_peer=peer, matching=(blackhole,), order=4)
+                    
+                    router.get_config(BGP).set_local_pref(name = 'import-from-'+link_type+'-'+peer, local_pref = 240, from_peer=peer, matching=(customer_default,), order = 5)
+                    router.get_config(BGP).set_local_pref(name = 'import-from-'+link_type+'-'+peer, local_pref = 220, from_peer=peer, matching=(customer_backup,),  order = 6)
                 
-                router.get_config(BGP).set_community(name = 'import-from-'+link_type+'-'+peer, community = 4001, from_peer=peer, matching=(customer_default,), order = 5)
-                router.get_config(BGP).set_community(name = 'import-from-'+link_type+'-'+peer, community = 4001, from_peer=peer, matching=(customer_backup,), order = 6)
-             
+                    router.get_config(BGP).set_community(name = 'import-from-'+link_type+'-'+peer, community = 4001, from_peer=peer, matching=(customer_default,), order = 5)
+                    router.get_config(BGP).set_community(name = 'import-from-'+link_type+'-'+peer, community = 4001, from_peer=peer, matching=(customer_backup,),  order = 6)
+              
                 router.get_config(BGP).deny('export-to-'+link_type+'-'+peer, to_peer = peer, matching=(no_advertise_all,), order=5)
                 router.get_config(BGP).deny('export-to-'+link_type+'-'+peer, to_peer = peer, matching=(no_advertise_na,), order=6)
                 
                 router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=1, asn=16276, to_peer = peer, matching=(prepend_all_1,), order = 16)
                 router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=2, asn=16276, to_peer = peer, matching=(prepend_all_2,), order = 17)
                 router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=3, asn=16276, to_peer = peer, matching=(prepend_all_3,), order = 18)
-                router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=1, asn=16276, to_peer = peer, matching=(prepend_na_1,), order = 19)
-                router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=2, asn=16276, to_peer = peer, matching=(prepend_na_2,), order = 20)
-                router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=3, asn=16276, to_peer = peer, matching=(prepend_na_3,), order = 21)
+                router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=1, asn=16276, to_peer = peer, matching=(prepend_na_1,),  order = 19)
+                router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=2, asn=16276, to_peer = peer, matching=(prepend_na_2,),  order = 20)
+                router.get_config(BGP).set_prepend(name = 'export-to-'+link_type+'-'+peer, size=3, asn=16276, to_peer = peer, matching=(prepend_na_3,),  order = 21)
 
         super().build(*args, **kwargs)
 
@@ -455,6 +574,75 @@ if __name__ == '__main__':
     net = IPNet(topo=OSPFNetOVH(link_params=LINK_PARAMS),allocate_IPs=False)
     try:
         net.start()
+
+        ###########################################
+        ###       Add firewall                  ###
+        ###########################################
+
+        routers_interface_external = [ 
+            [
+                ("rr1_lon1")
+            ],
+            [
+                ("rr1_nwk1")
+            ],
+            [
+                ("rr1_nwk2")
+            ],
+            [
+                ("rr2_par1")
+            ],
+            [
+                ("rr2_par2") 
+            ],
+            [
+                ("r_ymq1")
+            ]
+        ]
+
+        restrictions = port_restriction_cmd(routers_interface_external[0][0])
+        last = ""
+        for restriction in restrictions:
+            if last != restriction:
+                net["rr1_lon1"].cmd(restriction)
+            last = restriction
+
+        restrictions = port_restriction_cmd(routers_interface_external[1][0])
+        last = ""
+        for restriction in restrictions:
+            if last != restriction:
+                net["rr1_nwk1"].cmd(restriction)
+            last = restriction
+
+        restrictions = port_restriction_cmd(routers_interface_external[2][0])
+        last = ""
+        for restriction in restrictions:
+            if last != restriction:
+                net["rr1_nwk2"].cmd(restriction)
+            last = restriction
+
+        restrictions = port_restriction_cmd(routers_interface_external[3][0])
+        last = ""
+        for restriction in restrictions:
+            if last != restriction:
+                net["rr2_par1"].cmd(restriction)
+            last = restriction
+
+        restrictions = port_restriction_cmd(routers_interface_external[4][0])
+        last = ""
+        for restriction in restrictions:
+            if last != restriction:
+                net["rr2_par2"].cmd(restriction)
+            last = restriction
+
+        restrictions = port_restriction_cmd(routers_interface_external[5][0])
+        last = ""
+        for restriction in restrictions:
+            if last != restriction:
+                net["r_ymq1"].cmd(restriction)
+            last = restriction
+        
+
         IPCLI(net)
     finally:
         net.stop()
