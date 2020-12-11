@@ -1,6 +1,6 @@
 # LINGI2142-OVH
 
-## Installing our Ipmininet version
+## Installing our IPmininet version
 * `sudo ./setup.sh`
 
 ## Lauching our OVH topology
