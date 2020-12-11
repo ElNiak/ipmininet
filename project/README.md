@@ -1,6 +1,7 @@
 # LINGI2142-OVH
 
-## Setup
+## Installing our Ipmininet version
+* `./setup.sh`
 
-* Launch: `bash setup.sh` 
-
+## Lauching our OVH topology
+* `sudo ./OVH_main.py`
